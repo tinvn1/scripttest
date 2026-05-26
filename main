@@ -24,7 +24,7 @@ end
 -- ĐƯỜNG DẪN RAW LINK ĐÃ ĐƯỢC SỬA LỖI TRÙNG LẶP THƯ MỤC MAIN:
 local STAGE1_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/Stage1_GetFuel.lua"
 local STAGE2_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/Stage2_ReturnGen.lua"
-local STAGE3_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/Stage3_RepairBox.lua"
+local STAGE3_URL = "hhttps://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/Stage3_RepairBox.lua"
 
 task.spawn(function()
     while true do
