@@ -2,11 +2,10 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 
 print("[⚡ SYSTEM GITHUB] Khởi động Bootloader đồng bộ...");
 
+local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
+
 local function loadStage(url, name)
-    local success, content = pcall(function()
-        return game:HttpGet(url)
-    end)
-    
+    local success, content = pcall(function() return game:HttpGet(url) end)
     if success and content then
         local func, err = loadstring(content)
         if func then
@@ -21,38 +20,35 @@ local function loadStage(url, name)
     return false
 end
 
-local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
+-- 🔥 KÍCH HOẠT RIÊNG: Chạy luồng tự động cầm vũ khí song song xuyên suốt trò chơi
+task.spawn(function()
+    loadStage(baseUrl .. "AutoEquip.lua", "AutoEquip.lua")
+end)
 
--- Danh sách chạy tuần tự theo mảng:
+-- Danh sách các Stage làm nhiệm vụ chính tuần tự
 local stages = {
     "Stage1_GetFuel.lua", 
     "Stage2_ReturnGen.lua", 
     "Stage3_RepairBox.lua", 
-    "Stage4_Template.lua" -- Bắt buộc phải có file này ở cuối danh sách
+    "Stage4_Template.lua"
 }
 
 task.spawn(function()
     while true do
         local allStagesCleared = true
-        
         for _, stageName in ipairs(stages) do
             local currentUrl = baseUrl .. stageName
             local isDone = loadStage(currentUrl, stageName)
-            
-            -- Nếu một Stage trả về false (ngắt luồng do lệnh treo máy), bẻ gãy vòng lặp for ngay lập tức
             if not isDone then
                 allStagesCleared = false
                 break
             end
             task.wait(1)
         end
-        
-        -- Nếu gặp file Stage 4 treo máy (allStagesCleared = false), luồng vòng lặp while sẽ bị chặn đứng không thể quay lại Stage 1
         if not allStagesCleared then
             print("[🏁 SYSTEM] Luồng chính đã bị khóa tại trạm điện. Dừng chu kỳ!")
             break
         end
-        
         task.wait(2)
     end
 end)
