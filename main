@@ -1,0 +1,54 @@
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+print("[⚡ GITHUB LOAD] Đang thiết lập hệ thống chuỗi tiến trình...");
+
+local function loadStage(url, name)
+    local success, content = pcall(function()
+        return game:HttpGet(url)
+    end)
+    
+    if success and content then
+        local func, err = loadstring(content)
+        if func then
+            print("[🚀 START YIELD] Chạy tiến trình: " .. name)
+            return func() -- Chạy script con và treo luồng chính cho tới khi script con 'return true'
+        else
+            warn("Lỗi cú pháp file: " .. name .. " | " .. tostring(err))
+        end
+    else
+        warn("Không thể tải file từ GitHub của: " .. name)
+    end
+    return false
+end
+
+-- =========================================================================
+-- 🔴 ĐỔI 3 LINK RAW GITHUB CỦA BẠN VÀO ĐÂY:
+-- =========================================================================
+local STAGE1_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/main/Stage1_GetFuel.lua"
+local STAGE2_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/main/Stage2_ReturnGen.lua"
+local STAGE3_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/main/Stage3_RepairBox.lua"
+-- =========================================================================
+
+task.spawn(function()
+    while true do
+        print("[HỆ THỐNG] BẮT ĐẦU VÒNG CHƠI MỚI")
+        
+        -- Chạy Stage 1 (Đợi nhặt đủ 2 fuel xong mới xuống dòng dưới)
+        local s1_done = loadStage(STAGE1_URL, "Stage 1: Nhặt Fuel")
+        
+        if s1_done then
+            -- Chạy Stage 2 (Đợi chạy về nạp máy phát xong mới xuống dòng dưới)
+            local s2_done = loadStage(STAGE2_URL, "Stage 2: Về Máy Phát Điện")
+            
+            if s2_done then
+                -- Chạy Stage 3 (Đợi tiến sát trạm điện sửa xong mới kết thúc vòng)
+                local s3_done = loadStage(STAGE3_URL, "Stage 3: Sửa Trạm Điện PowerBox")
+                
+                if s3_done then
+                    print("[HỆ THỐNG] CHU KỲ HOÀN TẤT MƯỢT MÀ! Chuẩn bị lặp lại...");
+                end
+            end
+        end
+        task.wait(2)
+    end
+end)
