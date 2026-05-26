@@ -2,20 +2,26 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
-print("[💀 STAGE 5] Thực hiện cất vũ khí và bắt đầu nạp mạng...")
+-- 🔥 KHOẢNG NGHỈ AN TOÀN: Chặn Stage 5 nhảy sớm
+print("[⏳ STAGE 5] Đang chờ 10 giây để đảm bảo Stage 4 đã hoàn tất...")
+task.wait(10) 
 
--- BƯỚC 1: Cất vũ khí đúng 1 lần duy nhất bằng cách ép State nhân vật
+print("[💀 STAGE 5] Kích hoạt luồng nạp mạng...")
+
+-- BƯỚC 1: Tắt Auto Equip vĩnh viễn trong ván này
+_G.AllowAutoEquip = false 
+
+-- BƯỚC 2: Thao tác thả vũ khí (Bat) 1 lần duy nhất bằng cách ép State
 local char = localPlayer.Character
 local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-
 if humanoid then
     humanoid:ChangeState(Enum.HumanoidStateType.None)
     task.wait(0.2)
     humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-    print("[🎒] Đã thả vũ khí (cất đồ) một lần duy nhất.")
+    print("[🎒] Đã thả vũ khí (Bat) thành công.")
 end
 
--- BƯỚC 2: Tìm quái và nạp mạng như các bản trước
+-- BƯỚC 3: Quét quái và nạp mạng
 local targetMobNames = {["crawler"]=true, ["phaser"]=true, ["runner"]=true, ["zombie"]=true}
 
 local function getNearestMob(rootPosition)
