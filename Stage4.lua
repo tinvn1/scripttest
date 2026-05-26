@@ -1,72 +1,110 @@
-local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
-local localPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local localPlayer = game:GetService("Players").LocalPlayer
+local camera = workspace.CurrentCamera
 
--- Hàm Bypass Click cải tiến: Thử lại nhiều lần để đảm bảo nút được kích hoạt
-local function bypassClick(button)
-    if not button then return false end
-    
-    local success = false
-    -- Thử lại 5 lần nếu không thành công
-    for i = 1, 5 do
-        if button and button.Visible then
-            print("[Action] Đang thử nhấn nút lần: " .. i)
-            if getconnections then
-                for _, connection in pairs(getconnections(button.MouseButton1Click)) do
-                    connection:Fire()
-                end
-            end
-            button.MouseButton1Click:Fire()
-            success = true
-            task.wait(0.2)
-        end
-    end
-    return success
-end
-
--- Logic xử lý chính
-print("[Stage 5] Bắt đầu quy trình...")
-
--- 1. Ép chết nhân vật
-local char = localPlayer.Character
-if char then
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Dead) end
-    task.delay(0.5, function() if char then char:Destroy() end end)
-end
-
--- 2. Logic chờ và Click (Cải tiến tính ổn định)
-task.spawn(function()
-    local PlayerGui = localPlayer:WaitForChild("PlayerGui")
-    local foundButton = nil
-    
-    print("[Wait] Đang chờ UI xuất hiện...")
-    
-    -- Đợi đến khi nút tồn tại VÀ Visible là true
-    while not foundButton do
-        for _, obj in pairs(PlayerGui:GetDescendants()) do
-            if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
-                if obj.Visible then -- Kiểm tra trạng thái hiển thị
-                    foundButton = obj
-                    break
-                end
+-- =========================================================================
+-- 🔥 HÀM DÒ TÌM CHÍNH XÁC NÚT BẤM (PROXIMITYPROMPT) CỦA POWER PLANT
+-- =========================================================================
+local function getPowerBoxPrompt()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            -- Điều kiện 1: Nằm trực tiếp trong đối tượng tên "Power Box"
+            if obj.Parent and obj.Parent.Name == "Power Box" then
+                return obj
+            -- Điều kiện 2: Kiểm tra Text hiển thị trên màn hình có chữ "Power Plant" or "Repair"
+            elseif string.find(string.lower(obj.ObjectText), "power plant") or string.find(string.lower(obj.ActionText), "repair") then
+                return obj
             end
         end
-        task.wait(0.5)
     end
+    return nil
+end
+
+-- =========================================================================
+-- ĐIỀU CHỈNH CAMERA NGANG ĐỂ KHÔNG BỊ LỖI GÓC NHÌN TỪ TRÊN XUỐNG
+-- =========================================================================
+local function fixCameraForPrompt(promptTarget)
+    if promptTarget and promptTarget.Parent and promptTarget.Parent:IsA("BasePart") then
+        camera.CameraType = Enum.CameraType.Scriptable
+        -- Ép camera nhìn ngang thẳng vào Power Box thay vì chúi đầu từ trên xuống
+        local targetPos = promptTarget.Parent.Position
+        camera.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 7), targetPos)
+        task.wait(0.1)
+        camera.CameraType = Enum.CameraType.Custom
+    end
+end
+
+print("[🛠️ STAGE 4] Kích hoạt sửa máy Power Plant + Fix góc nhìn Camera...")
+
+local repairStarted = false
+local startTime = os.time()
+local holdConnection = nil
+
+while true do
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
     
-    -- Thực hiện click với cơ chế thử lại
-    if bypassClick(foundButton) then
-        print("[Success] Đã nhấn nút thành công. Chờ Rejoin...")
-        task.wait(1.5)
+    if root then
+        local prompt = getPowerBoxPrompt()
         
-        -- Rejoin
-        local teleportOptions = Instance.new("TeleportOptions")
-        teleportOptions.ServerInstanceId = game.JobId
-        pcall(function()
-            TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
-        end)
-    else
-        warn("[Error] Không thể kích hoạt nút!")
+        if prompt then
+            -- BẺ KHÓA PROXIMITYPROMPT: Tắt kiểm tra góc nhìn (Line of Sight)
+            -- Điều này giúp nút luôn luôn tương tác được bất kể camera đang ở góc nào
+            if prompt.RequiresLineOfSight then
+                prompt.RequiresLineOfSight = false
+            end
+            
+            -- Ép khoảng cách tương tác lớn hơn để tránh bị hụt khi đứng xa
+            if prompt.MaxActivationDistance < 15 then
+                prompt.MaxActivationDistance = 25
+            end
+
+            if not repairStarted then
+                print("[🖱️] Đã tìm thấy nút tương tác!")
+                
+                -- Sửa góc camera ngay lập tức để nút không bị kẹt ẩn
+                fixCameraForPrompt(prompt)
+                
+                print("[⏳] Tiến hành ép giữ nút sửa máy liên tục...")
+                repairStarted = true
+                startTime = os.time()
+                
+                -- Vòng lặp đè giữ nút siêu tốc
+                holdConnection = task.spawn(function()
+                    while repairStarted and prompt and prompt.Parent do
+                        if prompt.HoldDuration > 0 then
+                            prompt:InputHoldBegin()
+                        end
+                        fireproximityprompt(prompt) 
+                        task.wait(0.1)
+                    end
+                end)
+            end
+            
+            -- Chờ chạy hết 16 giây
+            if repairStarted and (os.time() - startTime) >= 16 then
+                print("[🎯 STAGE 4 SUCCESS] Đã giữ nút sửa máy hoàn tất thời gian!")
+                break
+            end
+        else
+            if repairStarted then
+                print("[🎯 STAGE 4 SUCCESS] Nút tương tác biến mất. Sửa máy thành công!")
+                break
+            else
+                print("[-] Đang chờ nhân vật đứng sát hoặc chờ nút sửa máy xuất hiện...")
+            end
+        end
     end
-end)
+    task.wait(0.2)
+end
+
+-- DỌN DẸP
+if holdConnection then
+    task.cancel(holdConnection)
+    local finalPrompt = getPowerBoxPrompt()
+    if finalPrompt then pcall(function() finalPrompt:InputHoldEnd() end) end
+end
+
+print("[🚀] Stage 4 hoàn thành sạch sẽ. Kích hoạt chuyển giao sang Stage 5...");
+_G.CurrentStage = 5
+return true
