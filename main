@@ -30,7 +30,7 @@ local stages = {
     "Stage1_GetFuel.lua", 
     "Stage2_ReturnGen.lua", 
     "Stage3_RepairBox.lua", 
-    "Stage4_Template.lua"
+    "Stage4.lua"
 }
 
 task.spawn(function()
