@@ -9,9 +9,9 @@ local camera = workspace.CurrentCamera
 local function getPowerBoxPrompt()
     for _, obj in pairs(Workspace:GetDescendants()) do
         if obj:IsA("ProximityPrompt") then
-            if obj.Parent and obj.Parent.Name == "Power Box" then [cite: 18, 19]
+            if obj.Parent and obj.Parent.Name == "Power Box" then
                 return obj
-            elseif string.find(string.lower(obj.ObjectText), "power plant") or string.find(string.lower(obj.ActionText), "repair") then [cite: 19]
+            elseif string.find(string.lower(obj.ObjectText), "power plant") or string.find(string.lower(obj.ActionText), "repair") then
                 return obj
             end
         end
@@ -23,22 +23,22 @@ end
 -- ĐIỀU CHỈNH CAMERA NGANG ĐỂ KHÔNG BỊ LỖI GÓC NHÌN TỪ TRÊN XUỐNG
 -- =========================================================================
 local function fixCameraForPrompt(promptTarget)
-    if promptTarget and promptTarget.Parent and promptTarget.Parent:IsA("BasePart") then [cite: 20]
-        camera.CameraType = Enum.CameraType.Scriptable [cite: 20]
-        local targetPos = promptTarget.Parent.Position [cite: 20]
-        camera.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 7), targetPos) [cite: 20]
-        task.wait(0.05) -- Giảm thời gian chờ camera xuống mức tối thiểu
-        camera.CameraType = Enum.CameraType.Custom [cite: 21]
+    if promptTarget and promptTarget.Parent and promptTarget.Parent:IsA("BasePart") then
+        camera.CameraType = Enum.CameraType.Scriptable
+        local targetPos = promptTarget.Parent.Position
+        camera.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 7), targetPos)
+        task.wait(0.05) -- Thời gian chờ tối thiểu để game render nút
+        camera.CameraType = Enum.CameraType.Custom
     end
 end
 
-print("[🛠️ STAGE 4] Kích hoạt sửa máy Power Plant (Bản Tốc Độ Cao)...") [cite: 21]
+print("[🛠️ STAGE 4] Kích hoạt sửa máy Power Plant (Luồng Cô Lập)...")
 
 local repairStarted = false
-local startTime = os.clock() -- Sử dụng os.clock() để tính chính xác mili-giây
+local startTime = os.clock() -- Tính toán chính xác mili-giây
 local holdConnection = nil
 
--- Sử dụng liên kết Heartbeat để quét và xử lý với tốc độ khung hình (siêu nhanh)
+-- Khởi tạo liên kết quét cục bộ (Local Connection) để tự hủy hoàn toàn khi xong việc
 local stage4Connection
 stage4Connection = RunService.Heartbeat:Connect(function()
     local char = localPlayer.Character
@@ -48,53 +48,55 @@ stage4Connection = RunService.Heartbeat:Connect(function()
         local prompt = getPowerBoxPrompt()
         
         if prompt then
-            -- Bypass thuộc tính che khuất tầm nhìn và tăng khoảng cách bấm
-            if prompt.RequiresLineOfSight then prompt.RequiresLineOfSight = false end [cite: 22]
-            if prompt.MaxActivationDistance < 15 then prompt.MaxActivationDistance = 25 end [cite: 23]
+            -- Bypass kiểm tra góc nhìn từ trên xuống của game lên ProximityPrompt
+            if prompt.RequiresLineOfSight then prompt.RequiresLineOfSight = false end
+            if prompt.MaxActivationDistance < 15 then prompt.MaxActivationDistance = 25 end
 
             if not repairStarted then
-                print("[🖱️] Đã tìm thấy nút tương tác!") [cite: 23, 24]
-                fixCameraForPrompt(prompt) [cite: 24]
+                print("[🖱️] Đã tìm thấy nút tương tác!")
+                fixCameraForPrompt(prompt)
                 
-                print("[⏳] Tiến hành ép giữ nút sửa máy liên tục...") [cite: 24, 25]
+                print("[⏳] Tiến hành ép giữ nút sửa máy liên tục...")
                 repairStarted = true
                 startTime = os.clock()
                 
-                -- Vòng lặp đè giữ nút siêu tốc chạy trên luồng phụ
+                -- Luồng ép giữ nút chạy song song tần suất cao
                 holdConnection = task.spawn(function()
-                    while repairStarted and prompt and prompt.Parent do [cite: 26]
+                    while repairStarted and prompt and prompt.Parent do
                         if prompt.HoldDuration > 0 then
-                            prompt:InputHoldBegin() [cite: 26]
+                            prompt:InputHoldBegin()
                         end
-                        fireproximityprompt(prompt) [cite: 27]
-                        task.wait(0.05) -- Tăng tốc độ gửi lệnh giữ (0.05s thay vì 0.1s)
+                        fireproximityprompt(prompt)
+                        task.wait(0.05) -- Nhấn giữ siêu tốc chống tuột phím
                     end
                 end)
             end
             
-            -- KIỂM TRA THỜI GIAN THỰC CHÍNH XÁC CAO: Đủ 16 giây là ngắt lập tức
+            -- ĐÚNG 16 GIÂY (Tính theo os.clock) -> NGẮT KẾT NỐI NGAY TỨC THÌ
             if repairStarted and (os.clock() - startTime) >= 16 then
-                print("[🎯 STAGE 4 SUCCESS] Đã giữ nút sửa máy hoàn tất thời gian!") [cite: 28]
+                print("[🎯 STAGE 4 SUCCESS] Đã giữ nút sửa máy hoàn tất thời gian!")
                 stage4Connection:Disconnect()
             end
         else
+            -- Nếu đang sửa mà nút biến mất trước (Do đồng đội sửa xong hoặc game nhận lệnh sớm)
             if repairStarted then
-                print("[🎯 STAGE 4 SUCCESS] Nút biến mất. Sửa máy thành công!") [cite: 29, 30]
+                print("[🎯 STAGE 4 SUCCESS] Nút biến mất. Sửa máy thành công!")
                 stage4Connection:Disconnect()
             end
         end
     end
 end)
 
--- Đợi cho đến khi kết nối quét dứt điểm hoàn toàn Stage 4
+-- Treo luồng script Stage 4 tạm thời cho đến khi Connection phía trên tự hủy hoàn toàn
 while stage4Connection.Connected do task.wait() end
 
--- DỌN DẸP LẬP TỨC
+-- DỌN DẸP SẠCH SẼ BỘ NHỚ LẬP TỨC
 repairStarted = false
-if holdConnection then task.cancel(holdConnection) end [cite: 30, 31]
-local finalPrompt = getPowerBoxPrompt() [cite: 31]
-if finalPrompt then pcall(function() finalPrompt:InputHoldEnd() end) end [cite: 31]
+if holdConnection then task.cancel(holdConnection) end
+local finalPrompt = getPowerBoxPrompt()
+if finalPrompt then pcall(function() finalPrompt:InputHoldEnd() end) end
 
-print("[🚀] Stage 4 hoàn thành sạch sẽ. Kích hoạt chuyển giao sang Stage 5..."); [cite: 31]
+-- CHUYỂN GIAO THẦN TỐC SANG STAGE 5
+print("[🚀] Stage 4 hoàn thành sạch sẽ. Kích hoạt chuyển giao sang Stage 5...");
 _G.CurrentStage = 5
 return true
