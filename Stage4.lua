@@ -1,10 +1,17 @@
 local Workspace = game:GetService("Workspace")
 local localPlayer = game:GetService("Players").LocalPlayer
 
+-- =========================================================================
+-- 🔥 HÀM DÒ TÌM CHÍNH XÁC NÚT BẤM (PROXIMITYPROMPT) CỦA POWER PLANT
+-- =========================================================================
 local function getPowerBoxPrompt()
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj.Name == "Prompt" and obj:IsA("ProximityPrompt") then
+        if obj:IsA("ProximityPrompt") then
+            -- Điều kiện 1: Nằm trực tiếp trong đối tượng tên "Power Box"
             if obj.Parent and obj.Parent.Name == "Power Box" then
+                return obj
+            -- Điều kiện 2: Kiểm tra Text hiển thị trên màn hình có chữ "Power Plant" hoặc "Repair"
+            elseif string.find(string.lower(obj.ObjectText), "power plant") or string.find(string.lower(obj.ActionText), "repair") then
                 return obj
             end
         end
@@ -12,7 +19,7 @@ local function getPowerBoxPrompt()
     return nil
 end
 
-print("[🛠️ STAGE 4] Bắt đầu tương tác sửa trạm điện thực tế...")
+print("[🛠️ STAGE 4] Chỉ thực hiện tác vụ sửa máy Power Plant...")
 
 local repairStarted = false
 local startTime = os.time()
@@ -25,34 +32,36 @@ while true do
         local prompt = getPowerBoxPrompt()
         
         if prompt then
+            -- Khi tìm thấy nút, giả lập nhấn giữ phím E ngay lập tức
             if not repairStarted then
-                print("[🖱️] Đã thấy nút Prompt! Tự động nhấn giữ để chạy thanh REPAIR...")
+                print("[🖱️] Đã tìm thấy nút tương tác! Tiến hành giữ nút sửa máy...")
+                
                 task.spawn(function()
                     fireproximityprompt(prompt)
                 end)
+                
                 repairStarted = true
-                startTime = os.time()
+                startTime = os.time() -- Ghi lại thời gian bắt đầu sửa
             end
             
-            -- Chờ vòng quay REPAIR chạy đủ thời gian (16 giây) giống video
+            -- Chờ vòng xoay REPAIR chạy hết 16 giây để hoàn thành nhiệm vụ
             if repairStarted and (os.time() - startTime) >= 16 then
-                print("[🎯 STAGE 4 HOÀN THÀNH] Đã sửa máy đủ thời gian ván đấu!")
+                print("[🎯 STAGE 4 SUCCESS] Đã giữ nút sửa máy hoàn tất thời gian!")
                 break
             end
         else
+            -- Nếu đang sửa mà nút Prompt biến mất nghĩa là máy đã hoàn thành sửa xong hoàn toàn
             if repairStarted then
-                print("[🎯 STAGE 4 HOÀN THÀNH] Prompt biến mất, máy đã sửa xong!")
+                print("[🎯 STAGE 4 SUCCESS] Nút tương tác biến mất. Sửa máy thành công!")
                 break
             else
-                print("[-] Đang chờ trạm điện xuất hiện Prompt sửa...")
+                print("[-] Đang chờ nhân vật đứng sát hoặc chờ nút sửa máy xuất hiện...")
             end
         end
     end
-    task.wait(0.5)
+    task.wait(0.5) -- Quét an toàn chống nặng máy
 end
 
--- 💡 Bạn có thể chèn thêm lệnh chỉnh sửa phụ của bạn ở ngay ĐÂY trước khi qua Stage 5
-
-print("[🚀] Stage 4 XONG. Kích hoạt chuyển giao sang Stage 5 để Reset...");
+print("[🚀] Stage 4 hoàn thành sạch sẽ. Kích hoạt chuyển giao sang Stage 5...");
 _G.CurrentStage = 5
 return true
