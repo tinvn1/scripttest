@@ -1,68 +1,76 @@
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 local localPlayer = Players.LocalPlayer
 
-print("[💀 STAGE 5] Phát hiện Anti-Reset trực tiếp! Kích hoạt phương thức phá hủy luồng nhân vật...")
+-- 1. Hàm hỗ trợ click bằng cách kích hoạt kết nối sự kiện (Bypass UI)
+local function bypassClick(button)
+    if not button then return end
+    print("[Action] Đang kích hoạt nút: " .. button.Name)
+    if getconnections then
+        for _, connection in pairs(getconnections(button.MouseButton1Click)) do
+            connection:Fire()
+        end
+    else
+        button.MouseButton1Click:Fire()
+    end
+end
+
+-- 2. Logic chính
+print("[Stage 5] Bắt đầu quy trình ép chết và hồi sinh...")
 
 local char = localPlayer.Character
 if char then
-    -- PHƯƠNG PHÁP 1: Xóa bỏ trực tiếp các bộ phận cốt lõi để ép Game Server phải xử lý Game Over
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local rootPart = char:FindFirstChild("HumanoidRootPart")
-    local head = char:FindFirstChild("Head")
-    
     if humanoid then
-        -- Thay vì trừ máu, ta ngắt kết nối trạng thái sống của Humanoid
         humanoid:ChangeState(Enum.HumanoidStateType.Dead)
     end
     
-    -- Phá hủy khớp nối đầu hoặc cổ để buộc nhân vật phải rã ra (Game tự tính là tử trận)
-    if head and head:FindFirstChildOfClass("Weld") then
-        head:FindFirstChildOfClass("Weld"):Destroy()
-    elseif char:FindFirstChild("Torso") and char.Torso:FindFirstChild("Neck") then
-        char.Torso.Neck:Destroy()
-    elseif char:FindFirstChild("UpperTorso") and char.UpperTorso:FindFirstChild("Neck") then
-        char.UpperTorso.Neck:Destroy()
+    -- Xóa khớp cổ để đảm bảo cơ chế chết của server được kích hoạt
+    local head = char:FindFirstChild("Head")
+    if head then
+        for _, v in pairs(head:GetChildren()) do
+            if v:IsA("Weld") or v:IsA("Motor6D") then v:Destroy() end
+        end
     end
     
-    -- Biện pháp bọc lót cuối cùng: Tự xóa vật thể cấu trúc nhân vật ở phía Client
-    task.delay(0.2, function()
-        if char and char.Parent then
-            char:Destroy()
-        end
+    -- Xóa nhân vật ở Client để dọn dẹp
+    task.delay(0.5, function()
+        if char and char.Parent then char:Destroy() end
     end)
 end
 
--- =========================================================================
--- VÒNG LẶP KIỂM TRA TRẠNG THÁI ĐỂ CHUYỂN SANG BẤM PLAY AGAIN (STAGE 6)
--- =========================================================================
-print("[⏳ STAGE 5] Đang đợi giao diện bảng Game Over (Play Again) xuất hiện...")
-
-local PlayerGui = localPlayer:WaitForChild("PlayerGui")
-local isGameOverReady = false
-
-while not isGameOverReady do
-    local gameOverVisible = false
+-- 3. Chờ giao diện hiện lên và thực hiện Rejoin
+task.spawn(function()
+    local PlayerGui = localPlayer:WaitForChild("PlayerGui")
+    local foundButton = nil
     
-    -- Dò tìm bảng UI hồi sinh / Play Again xuất hiện trên màn hình
-    for _, gui in pairs(PlayerGui:GetDescendants()) do
-        if gui:IsA("TextButton") and (string.find(string.lower(gui.Text), "play again") or gui.Name == "PlayAgain") then
-            if gui.Visible then
-                gameOverVisible = true
+    print("[Wait] Đang đợi giao diện Play Again...")
+    
+    -- Lặp lại đến khi thấy nút
+    while not foundButton do
+        for _, obj in pairs(PlayerGui:GetDescendants()) do
+            if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
+                foundButton = obj
                 break
             end
         end
+        task.wait(0.5)
     end
     
-    -- Khi bảng UI đã tải ra thành công, chứng tỏ nhân vật đã reset sạch sẽ
-    if gameOverVisible then
-        print("[🎯 STAGE 5 SUCCESS] Đã vượt qua Anti-Reset! Trận đấu đã kết thúc.")
-        break
+    -- Thực hiện hành động
+    if foundButton then
+        bypassClick(foundButton)
+        task.wait(1)
+        
+        -- Thực hiện Rejoin vào đúng server cũ
+        print("[Final] Thực hiện Rejoin...")
+        local teleportOptions = Instance.new("TeleportOptions")
+        teleportOptions.ServerInstanceId = game.JobId
+        
+        local success, err = pcall(function()
+            TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
+        end)
+        
+        if not success then warn("Lỗi Rejoin: " .. tostring(err)) end
     end
-    task.wait(0.5)
-end
-
-task.wait(1) -- Chờ thêm 1 giây để UI ổn định vị trí click
-
-print("[🚀] Chuyển giao luồng sang Stage 6 để tự động bấm nút Replay...");
-_G.CurrentStage = 6
-return true
+end)
