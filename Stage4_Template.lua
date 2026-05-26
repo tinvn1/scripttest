@@ -1,11 +1,17 @@
-print("[🛠️ STAGE 4] Nhân vật đã hoàn thành Stage 3 xuất sắc!")
-print("[⏳ HOLDING] Script tiến vào trạng thái chờ... Đứng im tại trạm điện và KHÔNG lặp lại Stage 1 nữa.")
+local Workspace = game:GetService("Workspace")
+local localPlayer = game:GetService("Players").LocalPlayer
 
--- Vòng lặp vô hạn chạy độc lập để giữ chân nhân vật đứng im tại Power Box
-while true do
-    task.wait(5)
-    -- Vòng lặp này không bao giờ kết thúc, khiến luồng code dừng mãi mãi ở đây cho đến khi bạn viết tính năng mới.
-end
-
--- Trả về false phòng hờ để bẻ gãy hoàn toàn bootloader chính nếu luồng bị tuột ra ngoài
-return false
+-- =========================================================================
+-- 🔥 HÀM TÌM NÚT BẤM PROXIMITYPROMPT CỦA TRẠM ĐIỆN
+-- =========================================================================
+local function getPowerBoxPrompt()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        -- Tìm kiếm chính xác đối tượng tên "Prompt" là ProximityPrompt nằm trong Power Box
+        if obj.Name == "Prompt" and obj:IsA("ProximityPrompt") then
+            -- Kiểm tra xem nó có thuộc về cấu trúc Power Plant -> Power Box không
+            if obj.Parent and obj.Parent.Name == "Power Box" then
+                return obj
+            end
+        end
+    end
+    return nil
