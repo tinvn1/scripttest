@@ -71,5 +71,5 @@ while not reached do
     task.wait(0.1)
 end
 
-print("[🏁] Xong Stage 3. Chuẩn bị chuyển tiếp sang Stage 4...")
-return true -- Trả về true để file main tiếp tục kích hoạt load file kế tiếp
+_G.CurrentStage = 4
+return true
