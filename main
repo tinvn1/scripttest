@@ -1,46 +1,71 @@
-if not game:IsLoaded() then game.Loaded:Wait() end
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local localPlayer = Players.LocalPlayer
 
-print("[⚡ SYSTEM GITHUB] Khởi động Main cũ - Chạy song song đồng bộ với ZHub...");
+print("[💀 STAGE 5] Kích hoạt chế độ nạp mạng...")
 
-local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
+-- BƯỚC 1: Tắt Auto Equip vĩnh viễn cho đến khi hết ván
+_G.AllowAutoEquip = false 
 
-local function runFile(fileName)
-    local success, content = pcall(function() 
-        return game:HttpGet(baseUrl .. fileName) 
-    end)
-    
-    if success and content then
-        -- 🔥 SỬA LỖI CHÍNH TẢ TRỰC TIẾP TRÊN CHUỖI VĂN BẢN
-        -- Thay thế trực tiếp từ ngữ lỗi trong code Stage 3, tuyệt đối không dùng metatable
-        -- Cách này giúp ZHub và hệ thống game chạy hoàn toàn độc lập, an toàn 100%
-        content = string.gsub(content, "Enum%.PathJointAction", "Enum.PathWaypointAction")
-        content = string.gsub(content, "PathJointAction", "PathWaypointAction")
-        
-        local func, err = loadstring(content)
-        if func then
-            print("[▶️] Đang chạy cấu phần: " .. fileName)
-            func() -- Chạy tuần tự theo cấu trúc main cũ ổn định của bạn
-        else
-            warn("Lỗi biên dịch cấu phần: " .. fileName .. " | " .. tostring(err))
-        end
-    else
-        warn("Không thể tải file từ GitHub: " .. fileName)
-    end
+-- BƯỚC 2: Thao tác thả vũ khí đúng 1 lần duy nhất
+local char = localPlayer.Character
+local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+if humanoid then
+    -- Ép trạng thái nhân vật về None để vũ khí rơi xuống, sau đó hồi phục ngay
+    humanoid:ChangeState(Enum.HumanoidStateType.None)
+    task.wait(0.1)
+    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    print("[🎒] Đã thả vũ khí thành công.")
 end
 
--- =========================================================================
--- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
--- =========================================================================
+-- BƯỚC 3: Quét quái và lao vào nạp mạng
+local targetMobNames = {["crawler"]=true, ["phaser"]=true, ["runner"]=true, ["zombie"]=true}
+
+local function getNearestMob(rootPosition)
+    local nearestMobPart = nil
+    local minDistance = math.huge
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and targetMobNames[string.lower(obj.Name)] then
+            local mobRoot = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+            local mobHumanoid = obj:FindFirstChildOfClass("Humanoid")
+            if mobRoot and mobHumanoid and mobHumanoid.Health > 0 then
+                local dist = (rootPosition - mobRoot.Position).Magnitude
+                if dist < minDistance then
+                    minDistance = dist
+                    nearestMobPart = mobRoot
+                end
+            end
+        end
+    end
+    return nearestMobPart
+end
+
+local gameOverVisible = false
 task.spawn(function()
-    runFile("AutoEquip.lua")
+    while not gameOverVisible do
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local targetMob = getNearestMob(root.Position)
+            if targetMob then
+                root.CFrame = targetMob.CFrame * CFrame.new(0, 0, 0.5)
+            else
+                local randomPos = root.Position + Vector3.new(math.random(-20,20), 0, math.random(-20,20))
+                root.CFrame = CFrame.new(randomPos.X, root.Position.Y, randomPos.Z)
+            end
+        end
+        task.wait(0.2)
+    end
 end)
 
--- =========================================================================
--- 🔄 LUỒNG TỰ ĐỘNG CHẠY CÁC STAGE TUẦN TỰ
--- =========================================================================
-runFile("Stage1_GetFuel.lua")   -- Tự nhặt xăng
-runFile("Stage2_ReturnGen.lua") -- Tự đổ xăng
-runFile("Stage3_RepairBox.lua") -- Tự tìm trạm điện vượt hàng rào
-runFile("Stage4.lua")           -- Tự đè nút E sửa máy
-runFile("Stage5.lua")           -- Tự động Reset nhân vật bypass Anti-Reset
-runFile("Stage6.lua")           -- Tự động bấm Play Again làm mới trận đấu
+-- Chờ bảng Play Again
+while not gameOverVisible do
+    for _, gui in pairs(localPlayer:WaitForChild("PlayerGui"):GetDescendants()) do
+        if gui:IsA("TextButton") and (string.find(string.lower(gui.Text), "play again")) then
+            if gui.Visible then gameOverVisible = true end
+        end
+    end
+    task.wait(0.5)
+end
+
+_G.CurrentStage = 6
+return true
