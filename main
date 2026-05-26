@@ -1,6 +1,6 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
-print("[⚡ SYSTEM GITHUB] Khởi động Bootloader chống trùng luồng tuyệt đối...");
+print("[⚡ SYSTEM GITHUB] Khởi động Bootloader đồng bộ chuẩn file...");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
@@ -12,14 +12,14 @@ local function loadStageFile(fileName)
     if success and content then
         local func, err = loadstring(content)
         if func then
-            print("[▶️] Kích hoạt cấu phần: " .. fileName)
+            print("[▶️] Kích hoạt cấu phần thành công: " .. fileName)
             task.spawn(func) -- Chạy biệt lập luồng để không làm nghẽn bootloader chính
             return true
         else
             warn("Lỗi biên dịch cấu phần: " .. fileName .. " | " .. tostring(err))
         end
     else
-        warn("Không thể tải file dữ liệu từ GitHub: " .. fileName)
+        warn("Không thể tải file (Sai tên hoặc sai đường dẫn): " .. fileName)
     end
     return false
 end
@@ -32,21 +32,39 @@ task.spawn(function()
 end)
 
 -- =========================================================================
--- 🔄 BỘ ĐIỀU PHỐI EVENT-DRIVEN (CHỈ CHẠY 1 LẦN DUY NHẤT KHI ĐỔI STAGE)
+-- 🔄 BỘ ĐIỀU PHỐI ĐỒNG BỘ CHÍNH XÁC TÊN FILE GITHUB
 -- =========================================================================
 local lastStage = 0
 _G.CurrentStage = 1 -- Khởi tạo bắt đầu ván mới với Stage 1
 
 task.spawn(function()
     while true do
-        -- Chỉ kích hoạt nạp file từ GitHub khi số Stage thực sự thay đổi!
+        -- Chỉ kích hoạt khi số Stage thực sự thay đổi!
         if _G.CurrentStage ~= lastStage then
             local currentToRun = _G.CurrentStage
-            lastStage = currentToRun -- Khóa chốt ngay lập tức để không bị nạp đè ở giây kế tiếp
+            lastStage = currentToRun -- Khóa chốt chặn trùng lập ngay lập tức
             
-            local stageName = "Stage" .. tostring(currentToRun) .. ".lua"
-            loadStageFile(stageName)
+            -- Định nghĩa lại chính xác tên file tương ứng với từng số Stage trên Git
+            local stageName = ""
+            if currentToRun == 1 then
+                stageName = "Stage1_GetFuel.lua"
+            elseif currentToRun == 2 then
+                stageName = "Stage2_ReturnGen.lua"
+            elseif currentToRun == 3 then
+                stageName = "Stage3_RepairBox.lua"
+            else
+                -- Các Stage 4, 5, 6 giữ nguyên định dạng số vì trên Git bạn đặt tên trơn
+                stageName = "Stage" .. tostring(currentToRun) .. ".lua"
+            end
+            
+            -- Thực hiện nạp file
+            local launched = loadStageFile(stageName)
+            
+            -- Nếu nạp thất bại (ví dụ lỗi mạng không tải được file), mở khóa để hệ thống thử lại sau
+            if not launched then
+                lastStage = 0
+            end
         end
-        task.wait(0.5) -- Quét trạng thái số cực nhẹ, không hề tải lại file cũ
+        task.wait(1) -- Quét trạng thái mỗi giây, cực nhẹ và an toàn cho game
     end
 end)
