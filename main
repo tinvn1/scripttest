@@ -1,54 +1,57 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
-print("[⚡ SYSTEM GITHUB] Khởi động Bootloader đồng bộ...");
+print("[⚡ SYSTEM GITHUB] Khởi động Bootloader cấu trúc linh hoạt (Stage 1 -> 6)...");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
+_G.CurrentStage = 1 -- Khởi tạo bắt đầu chạy từ Stage 1 ở ván mới
 
-local function loadStage(url, name)
-    local success, content = pcall(function() return game:HttpGet(url) end)
+local function loadStageFile(fileName)
+    local success, content = pcall(function() 
+        return game:HttpGet(baseUrl .. fileName) 
+    end)
+    
     if success and content then
         local func, err = loadstring(content)
         if func then
-            print("[▶️] Đang chạy cấu phần: " .. name)
-            return func() 
+            print("[▶️] Đang chạy cấu phần: " .. fileName)
+            return func()
         else
-            warn("Lỗi biên dịch cấu phần: " .. name .. " | " .. tostring(err))
+            warn("Lỗi biên dịch cấu phần: " .. fileName .. " | " .. tostring(err))
         end
     else
-        warn("Không thể tải dữ liệu trực tuyến từ GitHub: " .. name)
+        warn("Không thể tải file dữ liệu từ GitHub: " .. fileName)
     end
     return false
 end
 
--- 🔥 KÍCH HOẠT RIÊNG: Chạy luồng tự động cầm vũ khí song song xuyên suốt trò chơi
+-- =========================================================================
+-- ⚔️ LUỒNG 1: Chạy song song tệp tự động cầm vũ khí độc lập
+-- =========================================================================
 task.spawn(function()
-    loadStage(baseUrl .. "AutoEquip.lua", "AutoEquip.lua")
+    loadStageFile("AutoEquip.lua")
 end)
 
--- Danh sách các Stage làm nhiệm vụ chính tuần tự
-local stages = {
-    "Stage1_GetFuel.lua", 
-    "Stage2_ReturnGen.lua", 
-    "Stage3_RepairBox.lua", 
-    "Stage4.lua"
-}
-
+-- =========================================================================
+-- 🔄 LUỒNG 2: Bộ điều phối vòng lặp các Stage tuần tự
+-- =========================================================================
 task.spawn(function()
+    local lastStageExecuted = 0
+    
     while true do
-        local allStagesCleared = true
-        for _, stageName in ipairs(stages) do
-            local currentUrl = baseUrl .. stageName
-            local isDone = loadStage(currentUrl, stageName)
-            if not isDone then
-                allStagesCleared = false
-                break
+        -- Chỉ kích hoạt tải file mới khi có sự thay đổi về số Stage (_G.CurrentStage)
+        if _G.CurrentStage ~= lastStageExecuted then
+            local stageName = "Stage" .. tostring(_G.CurrentStage) .. ".lua"
+            lastStageExecuted = _G.CurrentStage
+            
+            -- Thực hiện tải và kích hoạt Stage hiện tại
+            local success = loadStageFile(stageName)
+            
+            -- Bẫy lỗi: Nếu file chạy thất bại (trả về false), đặt lại mốc để hệ thống thử nạp lại Stage đó
+            if not success then
+                print("[⚠️] Cấu phần " .. stageName .. " phản hồi ngắt luồng hoặc lỗi. Sẽ thử lại...")
+                lastStageExecuted = 0 
             end
-            task.wait(1)
         end
-        if not allStagesCleared then
-            print("[🏁 SYSTEM] Luồng chính đã bị khóa tại trạm điện. Dừng chu kỳ!")
-            break
-        end
-        task.wait(2)
+        task.wait(1) -- Thời gian nghỉ quét luồng để bảo vệ CPU không bị lag game
     end
 end)
