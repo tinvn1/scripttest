@@ -59,5 +59,5 @@ while not arrivedGen do
         task.wait(1)
     end
 end
-
+_G.CurrentStage = 3
 return true
