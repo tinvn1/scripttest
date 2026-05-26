@@ -1,18 +1,6 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- 🔥 BẢN VÁ TỪ XA: Sửa lỗi chính tả hệ thống cho Stage 3 tự động
-if not pcall(function() return Enum.PathJointAction end) then
-    local enumFake = {}
-    setmetatable(enumFake, {
-        __index = function(_, key)
-            if key == "PathJointAction" then return Enum.PathWaypointAction end
-            return Enum[key]
-        end
-    })
-    getfenv(1).Enum = enumFake
-end
-
-print("[⚡ SYSTEM GITHUB] Khởi động Main cũ tối ưu đồng bộ...");
+print("[⚡ SYSTEM GITHUB] Khởi động Main cũ - Phiên bản chống tràn bộ nhớ...");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
@@ -22,16 +10,19 @@ local function runFile(fileName)
     end)
     
     if success and content then
+        -- 🔥 BẢN VÁ AN TOÀN TUYỆT ĐỐI: Thay thế trực tiếp chữ sai chính tả thành chữ đúng trong chuỗi code
+        -- Cách này giúp xử lý triệt để mà không đụng chạm vào hệ thống Enum gốc của Roblox, chống lỗi C Stack Overflow
+        content = string.gsub(content, "Enum.PathJointAction", "Enum.PathWaypointAction")
+        
         local func, err = loadstring(content)
         if func then
-            setfenv(func, getfenv(1)) -- Truyền bản vá lỗi vào file con
             print("[▶️] Đang chạy cấu phần: " .. fileName)
-            func() -- Chạy trực tiếp theo kiểu main cũ của bạn
+            func() -- Chạy tuần tự mượt mà theo kiểu main cũ
         else
             warn("Lỗi biên dịch: " .. fileName .. " | " .. tostring(err))
         end
     else
-        warn("Không thể tải file: " .. fileName)
+        warn("Không thể tải file từ GitHub: " .. fileName)
     end
 end
 
@@ -45,10 +36,10 @@ end)
 -- =========================================================================
 -- 🔄 LUỒNG CHẠY TUẦN TỰ MƯỢT MÀ CỦA MAIN CŨ
 -- =========================================================================
--- Gọi đúng tên file trên GitHub của bạn theo thứ tự từ Stage 1 đến Stage 6
-runFile("Stage1_GetFuel.lua")   -- Tự nhặt 2 bình xăng
-runFile("Stage2_ReturnGen.lua") -- Tự chạy về đổ xăng
-runFile("Stage3_RepairBox.lua") -- Tự tìm đường tới trạm điện vượt rào
-runFile("Stage4.lua")           -- Tự đè phím E sửa máy
-runFile("Stage5.lua")           -- Tự động Reset nhân vật bypass Anti-Reset
-runFile("Stage6.lua")           -- Tự động bấm Play Again làm mới trận đấu
+-- Gọi chính xác các file tương ứng trên GitHub của bạn
+runFile("Stage1_GetFuel.lua")   -- Nhặt xăng
+runFile("Stage2_ReturnGen.lua") -- Đổ xăng
+runFile("Stage3_RepairBox.lua") -- Tìm trạm điện vượt rào
+runFile("Stage4.lua")           -- Đè nút E sửa máy
+runFile("Stage5.lua")           -- Reset nhân vật bypass Anti-Reset
+runFile("Stage6.lua")           -- Tự bấm Play Again làm mới trận
