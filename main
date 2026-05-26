@@ -1,80 +1,54 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- 🔥 BẢN VÁ LỖI HỆ THỐNG: Định nghĩa giả lập PathJointAction để chặn đứng lỗi crash
+-- 🔥 BẢN VÁ TỪ XA: Sửa lỗi chính tả hệ thống cho Stage 3 tự động
 if not pcall(function() return Enum.PathJointAction end) then
     local enumFake = {}
     setmetatable(enumFake, {
         __index = function(_, key)
-            if key == "PathJointAction" then
-                return Enum.PathWaypointAction -- Ép Roblox tự hiểu sang đúng Enum chuẩn
-            end
+            if key == "PathJointAction" then return Enum.PathWaypointAction end
             return Enum[key]
         end
     })
     getfenv(1).Enum = enumFake
 end
 
-print("[⚡ SYSTEM GITHUB] Khởi động Bootloader chống lỗi hệ thống...");
+print("[⚡ SYSTEM GITHUB] Khởi động Main cũ tối ưu đồng bộ...");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
-local function loadStageFile(fileName)
+local function runFile(fileName)
     local success, content = pcall(function() 
         return game:HttpGet(baseUrl .. fileName) 
     end)
     
     if success and content then
-        -- Truyền môi trường chứa bản vá Enum vào trong file được tải về
         local func, err = loadstring(content)
         if func then
-            setfenv(func, getfenv(1))
-            print("[▶️] Kích hoạt cấu phần thành công: " .. fileName)
-            task.spawn(func)
-            return true
+            setfenv(func, getfenv(1)) -- Truyền bản vá lỗi vào file con
+            print("[▶️] Đang chạy cấu phần: " .. fileName)
+            func() -- Chạy trực tiếp theo kiểu main cũ của bạn
         else
-            warn("Lỗi biên dịch cấu phần: " .. fileName .. " | " .. tostring(err))
+            warn("Lỗi biên dịch: " .. fileName .. " | " .. tostring(err))
         end
     else
-        warn("Không thể tải file (Sai tên hoặc sai đường dẫn): " .. fileName)
+        warn("Không thể tải file: " .. fileName)
     end
-    return false
 end
 
 -- =========================================================================
--- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
+-- ⚔️ CHẠY TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
 -- =========================================================================
 task.spawn(function()
-    loadStageFile("AutoEquip.lua")
+    runFile("AutoEquip.lua")
 end)
 
 -- =========================================================================
--- 🔄 BỘ ĐIỀU PHỐI ĐỒNG BỘ CHÍNH XÁC TÊN FILE GITHUB
+-- 🔄 LUỒNG CHẠY TUẦN TỰ MƯỢT MÀ CỦA MAIN CŨ
 -- =========================================================================
-local lastStage = 0
-_G.CurrentStage = 1
-
-task.spawn(function()
-    while true do
-        if _G.CurrentStage ~= lastStage then
-            local currentToRun = _G.CurrentStage
-            lastStage = currentToRun -- Khóa chốt chặn trùng lập
-            
-            local stageName = ""
-            if currentToRun == 1 then
-                stageName = "Stage1_GetFuel.lua"
-            elseif currentToRun == 2 then
-                stageName = "Stage2_ReturnGen.lua"
-            elseif currentToRun == 3 then
-                stageName = "Stage3_RepairBox.lua"
-            else
-                stageName = "Stage" .. tostring(currentToRun) .. ".lua"
-            end
-            
-            local launched = loadStageFile(stageName)
-            if not launched then
-                lastStage = 0 -- Mở khóa nếu tải file thất bại
-            end
-        end
-        task.wait(1)
-    end
-end)
+-- Gọi đúng tên file trên GitHub của bạn theo thứ tự từ Stage 1 đến Stage 6
+runFile("Stage1_GetFuel.lua")   -- Tự nhặt 2 bình xăng
+runFile("Stage2_ReturnGen.lua") -- Tự chạy về đổ xăng
+runFile("Stage3_RepairBox.lua") -- Tự tìm đường tới trạm điện vượt rào
+runFile("Stage4.lua")           -- Tự đè phím E sửa máy
+runFile("Stage5.lua")           -- Tự động Reset nhân vật bypass Anti-Reset
+runFile("Stage6.lua")           -- Tự động bấm Play Again làm mới trận đấu
