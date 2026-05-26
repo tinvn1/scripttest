@@ -21,25 +21,31 @@ local function loadStage(url, name)
     return false
 end
 
--- ĐƯỜNG DẪN RAW LINK ĐÃ ĐƯỢC SỬA LỖI TRÙNG LẶP THƯ MỤC MAIN:
-local STAGE1_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/Stage1_GetFuel.lua"
-local STAGE2_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/Stage2_ReturnGen.lua"
-local STAGE3_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/Stage3_RepairBox.lua"
+local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
+
+-- 🔥 ĐÃ CHỈNH SỬA: Thêm Stage 4 vào danh sách chạy tuần tự
+local stages = {
+    "Stage1_GetFuel.lua", 
+    "Stage2_ReturnGen.lua", 
+    "Stage3_RepairBox.lua", 
+    "Stage4_Template.lua" -- File trung gian giữ chân nhân vật
+}
 
 task.spawn(function()
     while true do
-        print("[HỆ THỐNG] KHỞI ĐỘNG CHU KỲ TRẬN ĐẤU MỚI")
-        
-        local s1_done = loadStage(STAGE1_URL, "Stage 1: Nhặt Fuel")
-        if s1_done then
-            local s2_done = loadStage(STAGE2_URL, "Stage 2: Về Máy Phát Điện")
-            if s2_done then
-                local s3_done = loadStage(STAGE3_URL, "Stage 3: Sửa Trạm Điện PowerBox")
-                if s3_done then
-                    print("[HỆ THỐNG] CHU KỲ HOÀN TẤT XUẤT SẮC KHÔNG LỖI!");
-                end
+        for _, stageName in ipairs(stages) do
+            local currentUrl = baseUrl .. stageName
+            -- Tải và chạy tuần tự, file trước hoàn thành (return true) thì file sau mới chạy
+            local isDone = loadStage(currentUrl, stageName)
+            
+            if not isDone then
+                -- Nếu cấu phần trả về false (ngắt luồng do lỗi hoặc do lệnh giữ chân), dừng vòng lặp tại đây
+                print("[⚠️] Phát hiện luồng dừng hoặc lỗi tại: " .. stageName)
+                break
             end
+            task.wait(1)
         end
-        task.wait(2)
+        -- Dừng hẳn 5 giây trước khi check lại hệ thống, tránh spam log game
+        task.wait(5)
     end
 end)
