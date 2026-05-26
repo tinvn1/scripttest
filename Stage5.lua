@@ -2,30 +2,23 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
--- 🔥 CHỐT CHẶN: Chỉ chạy khi main.lua đã xác nhận đến Stage 5
-if _G.CurrentStage ~= 5 then
-    print("[⏳ STAGE 5] Đang chờ Stage 4 hoàn tất...")
-    -- Vòng lặp này sẽ giữ script ở đây cho đến khi hệ thống chính chuyển sang Stage 5
-    repeat task.wait(0.5) until _G.CurrentStage == 5
-end
+print("[💀 STAGE 5] Đã vào phân đoạn nạp mạng. Tiến hành tắt Auto Equip...")
 
-print("[💀 STAGE 5] Đã xác nhận Stage 5, bắt đầu kích hoạt...")
-
--- BƯỚC 1: SẬP CÔNG TẮC TẮT LỆNH AUTO EQUIP TỪ XA
+-- 🔥 BƯỚC 1: SẬP CÔNG TẮC TẮT LỆNH AUTO EQUIP TỪ XA
 _G.AllowAutoEquip = false 
 
 task.wait(0.2) -- Chờ một nhịp nhỏ để luồng AutoEquip dừng hẳn
 
--- BƯỚC 2: RA LỆNH CẤT VŨ KHÍ VÀO BALO
+-- 🔥 BƯỚC 2: RA LỆNH CẤT VŨ KHÍ VÀO BALO (SẴN CẤT ĐỒ LUÔN)
 local char = localPlayer.Character
 local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 if humanoid then
-    humanoid:UnequipTools() 
+    humanoid:UnequipTools() -- Tắt vũ khí trên tay đưa về Balo
     print("[🎒 STAGE 5] Đã tắt và cất vũ khí vào balo thành công!")
 end
 
 -- =========================================================================
--- DANH SÁCH CÁC LOẠI QUÁI
+-- 🔥 DANH SÁCH CÁC LOẠI QUÁI ĐƯỢC PHÁT HIỆN TRONG MAP
 -- =========================================================================
 local targetMobNames = {
     ["crawler"] = true,
@@ -60,7 +53,7 @@ local function getNearestMob(rootPosition)
 end
 
 -- =========================================================================
--- VÒNG LẶP ÉP DÍNH VÀO QUÁI ĐỂ CHẾT
+-- 🔄 VÒNG LẶP ÉP DÍNH VÀO QUÁI ĐỂ CHẾT (KHÔNG CẦN CHẠY VÒNG LẶP CẤT ĐỒ NỮA)
 -- =========================================================================
 local PlayerGui = localPlayer:WaitForChild("PlayerGui")
 local gameOverVisible = false
@@ -74,6 +67,7 @@ task.spawn(function()
         if root and humanoid and humanoid.Health > 0 then
             local targetMob = getNearestMob(root.Position)
             if targetMob then
+                -- Dịch chuyển dính chặt vào quái để nhận sát thương
                 root.CFrame = targetMob.CFrame * CFrame.new(0, 0, 0.5)
             else
                 local randomPos = root.Position + Vector3.new(math.random(-20, 20), 0, math.random(-20, 20))
@@ -85,7 +79,7 @@ task.spawn(function()
 end)
 
 -- =========================================================================
--- ĐỢI BẢNG UI GAME OVER / REPLAY XUẤT HIỆN
+-- ⏳ ĐỢI BẢNG UI GAME OVER / REPLAY XUẤT HIỆN
 -- =========================================================================
 while not gameOverVisible do
     for _, gui in pairs(PlayerGui:GetDescendants()) do
