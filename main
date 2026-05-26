@@ -16,36 +16,43 @@ local function loadStage(url, name)
             warn("Lỗi biên dịch cấu phần: " .. name .. " | " .. tostring(err))
         end
     else
-        warn("Không thể tải dữ liệu đường dẫn trực tuyến từ GitHub: " .. name)
+        warn("Không thể tải dữ liệu trực tuyến từ GitHub: " .. name)
     end
     return false
 end
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
--- 🔥 ĐÃ CHỈNH SỬA: Thêm Stage 4 vào danh sách chạy tuần tự
+-- Danh sách chạy tuần tự theo mảng:
 local stages = {
     "Stage1_GetFuel.lua", 
     "Stage2_ReturnGen.lua", 
     "Stage3_RepairBox.lua", 
-    "Stage4_Template.lua" -- File trung gian giữ chân nhân vật
+    "Stage4_Template.lua" -- Bắt buộc phải có file này ở cuối danh sách
 }
 
 task.spawn(function()
     while true do
+        local allStagesCleared = true
+        
         for _, stageName in ipairs(stages) do
             local currentUrl = baseUrl .. stageName
-            -- Tải và chạy tuần tự, file trước hoàn thành (return true) thì file sau mới chạy
             local isDone = loadStage(currentUrl, stageName)
             
+            -- Nếu một Stage trả về false (ngắt luồng do lệnh treo máy), bẻ gãy vòng lặp for ngay lập tức
             if not isDone then
-                -- Nếu cấu phần trả về false (ngắt luồng do lỗi hoặc do lệnh giữ chân), dừng vòng lặp tại đây
-                print("[⚠️] Phát hiện luồng dừng hoặc lỗi tại: " .. stageName)
+                allStagesCleared = false
                 break
             end
             task.wait(1)
         end
-        -- Dừng hẳn 5 giây trước khi check lại hệ thống, tránh spam log game
-        task.wait(5)
+        
+        -- Nếu gặp file Stage 4 treo máy (allStagesCleared = false), luồng vòng lặp while sẽ bị chặn đứng không thể quay lại Stage 1
+        if not allStagesCleared then
+            print("[🏁 SYSTEM] Luồng chính đã bị khóa tại trạm điện. Dừng chu kỳ!")
+            break
+        end
+        
+        task.wait(2)
     end
 end)
