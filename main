@@ -1,6 +1,6 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
-print("[⚡ SYSTEM GITHUB] Khởi động Main cũ - Phiên bản chống tràn bộ nhớ...");
+print("[⚡ SYSTEM GITHUB] Khởi động Main cũ - Phiên bản SIÊU SẠCH chống tràn...");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
@@ -10,9 +10,10 @@ local function runFile(fileName)
     end)
     
     if success and content then
-        -- 🔥 BẢN VÁ AN TOÀN TUYỆT ĐỐI: Thay thế trực tiếp chữ sai chính tả thành chữ đúng trong chuỗi code
-        -- Cách này giúp xử lý triệt để mà không đụng chạm vào hệ thống Enum gốc của Roblox, chống lỗi C Stack Overflow
-        content = string.gsub(content, "Enum.PathJointAction", "Enum.PathWaypointAction")
+        -- 🔥 SỬA LỖI TỪ XA BẰNG THAY THẾ CHUỖI KHÔNG DÙNG METATABLE
+        -- Ép thẳng chữ sai chính tả hệ thống thành chữ đúng trước khi biên dịch, chặn đứng lỗi Line 9
+        content = string.gsub(content, "Enum%.PathJointAction", "Enum.PathWaypointAction")
+        content = string.gsub(content, "PathJointAction", "PathWaypointAction")
         
         local func, err = loadstring(content)
         if func then
@@ -36,7 +37,6 @@ end)
 -- =========================================================================
 -- 🔄 LUỒNG CHẠY TUẦN TỰ MƯỢT MÀ CỦA MAIN CŨ
 -- =========================================================================
--- Gọi chính xác các file tương ứng trên GitHub của bạn
 runFile("Stage1_GetFuel.lua")   -- Nhặt xăng
 runFile("Stage2_ReturnGen.lua") -- Đổ xăng
 runFile("Stage3_RepairBox.lua") -- Tìm trạm điện vượt rào
