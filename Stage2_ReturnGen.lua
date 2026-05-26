@@ -1,69 +1,63 @@
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 local PathfindingService = game:GetService("PathfindingService")
 local localPlayer = game:GetService("Players").LocalPlayer
-local RUN_SPEED = 30
+local TWEEN_SPEED = 30
 
-local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true})
+local path = PathfindingService:CreatePath({AgentRadius = 1.8, AgentHeight = 5, AgentCanJump = true})
 
--- Cấu hình vị trí đích của Stage 2 (Thay đổi Vector3 phù hợp với vị trí mong muốn của bạn)
-local STAGE2_TARGET_POS = Vector3.new(100, 0, 100) 
+local function getGenerator()
+    local generator = Workspace:FindFirstChild("Generator", true)
+    if generator then
+        return generator:FindFirstChild("MainPart") or generator.PrimaryPart or generator:FindFirstChildWhichIsA("BasePart")
+    end
+    return nil
+end
 
-local function walkToStage2Target(rootPart, humanoid)
-    path:ComputeAsync(rootPart.Position, STAGE2_TARGET_POS)
+local function walkPathToTarget(rootPart, targetPart)
+    if not rootPart or not targetPart or not targetPart.Parent then return false end
+    path:ComputeAsync(rootPart.Position, targetPart.Position)
+    
     if path.Status == Enum.PathStatus.Success then
         for _, waypoint in ipairs(path:GetWaypoints()) do
-            if humanoid.WalkSpeed ~= RUN_SPEED then humanoid.WalkSpeed = RUN_SPEED end
-            if waypoint.Action == Enum.PathWaypointAction.Jump then humanoid.Jump = true end
-            
-            humanoid:MoveTo(waypoint.Position)
-            
-            local movedToFinished = false
-            local startPos = rootPart.Position
-            local startTime = os.clock()
-            
-            local connection = humanoid.MoveToFinished:Connect(function()
-                movedToFinished = true
-            end)
-            
-            while not movedToFinished do
-                if (os.clock() - startTime) > 0.35 then
-                    if (rootPart.Position - startPos).Magnitude < 2 then
-                        humanoid.Jump = true
-                        rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 3.2, 0)
-                        humanoid:MoveTo(waypoint.Position)
-                    end
-                    startTime = os.clock()
-                    startPos = rootPart.Position
-                end
-                task.wait(0.05)
-            end
-            if connection then connection:Disconnect() end
+            if not rootPart.Parent or not targetPart.Parent then return false end
+            local expectedCFrame = CFrame.new(waypoint.Position.X, waypoint.Position.Y + 2, waypoint.Position.Z)
+            local tween = TweenService:Create(rootPart, TweenInfo.new((rootPart.Position - waypoint.Position).Magnitude / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = expectedCFrame})
+            tween:Play()
+            tween.Completed:Wait()
+            task.wait(0.01)
         end
         return true
+    else
+        local nhichPos = rootPart.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
+        TweenService:Create(rootPart, TweenInfo.new(3 / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = CFrame.new(nhichPos.X, rootPart.Position.Y, nhichPos.Z)}):Play()
+        task.wait(0.2)
+        return false
     end
-    return false
 end
 
-print("[STAGE 2] Khởi chạy di chuyển khu vực...")
-local stage2Finished = false
+print("[STAGE 2] Đang di chuyển về Generator...")
+local arrivedGen = false
 
-while not stage2Finished do
+while not arrivedGen do
     local char = localPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if not root then task.wait(1) continue end
     
-    if root and humanoid then
-        humanoid.WalkSpeed = RUN_SPEED
-        local dist = (root.Position - STAGE2_TARGET_POS).Magnitude
-        if dist > 5 then
-            walkToStage2Target(root, humanoid)
+    local targetGen = getGenerator()
+    if targetGen then
+        local success = walkPathToTarget(root, targetGen)
+        if success then
+            print("[STAGE 2] HOÀN THÀNH! Đã nạp xong nhiên liệu.")
+            arrivedGen = true
+            task.wait(1)
         else
-            stage2Finished = true
+            task.wait(0.1)
         end
+    else
+        print("[⚠️] Không tìm thấy trạm Generator trên bản đồ!")
+        task.wait(1)
     end
-    task.wait(0.1)
 end
-
-print("[🚀] Stage 2 xong. Qua Stage 3...");
 _G.CurrentStage = 3
 return true
