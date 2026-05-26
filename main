@@ -44,3 +44,4 @@ runFile("Stage3_RepairBox.lua") -- Tự tìm trạm điện vượt hàng rào
 runFile("Stage4.lua")           -- Tự đè nút E sửa máy
 runFile("Stage5.lua")           -- Tự động Reset nhân vật bypass Anti-Reset
 runFile("Stage6.lua")           -- Tự động bấm Play Again làm mới trận đấu
+--new
