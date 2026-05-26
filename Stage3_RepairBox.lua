@@ -6,37 +6,48 @@ local TWEEN_SPEED = 30
 
 local path = PathfindingService:CreatePath({AgentRadius = 1.8, AgentHeight = 5, AgentCanJump = true})
 
--- THAY THẾ HÀM QUÉT THÔNG MINH: Tìm kiếm trạm điện theo từ khóa chống sót tên Model
+-- HÀM QUÉT NÂNG CAO: Lục lọi cấu trúc tầng của Power Plant -> Power Box
 local function getNearestPowerBox(rootPosition)
-    local nearestBox = nil
+    local nearestBoxPart = nil
     local minDistance = math.huge
     
     for _, obj in pairs(Workspace:GetDescendants()) do
-        -- Kiểm tra nếu vật thể là Model hoặc BasePart và có tên chứa cụm từ khóa liên quan
-        if obj:IsA("Model") or obj:IsA("BasePart") then
-            local objName = string.lower(obj.Name)
-            if string.find(objName, "power") and string.find(objName, "box") then
-                -- Lấy phần linh kiện chính để di chuyển tới
-                local part = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
-                if part then
-                    local dist = (rootPosition - part.Position).Magnitude
-                    if dist < minDistance then 
-                        minDistance = dist
-                        nearestBox = part 
-                    end
+        -- Tìm kiếm Model hoặc Part có tên chính xác là "Power Box"
+        if obj.Name == "Power Box" then
+            local targetPart = nil
+            
+            -- Nếu là Model, ưu tiên tìm linh kiện bên trong để di chuyển tới
+            if obj:IsA("Model") then
+                targetPart = obj.PrimaryPart 
+                    or obj:FindFirstChild("PB_HL") 
+                    or obj:FindFirstChild("Prompt") 
+                    or obj:FindFirstChildWhichIsA("BasePart")
+            elseif obj:IsA("BasePart") then
+                targetPart = obj
+            end
+            
+            -- Tính toán khoảng cách
+            if targetPart then
+                local dist = (rootPosition - targetPart.Position).Magnitude
+                if dist < minDistance then 
+                    minDistance = dist
+                    nearestBoxPart = targetPart 
                 end
             end
         end
     end
-    return nearestBox
+    return nearestBoxPart
 end
 
 local function walkPathToTarget(rootPart, targetPart)
     if not rootPart or not targetPart or not targetPart.Parent then return false end
+    
+    -- Tính toán đường đi an toàn bằng Pathfinding
     path:ComputeAsync(rootPart.Position, targetPart.Position)
     
     if path.Status == Enum.PathStatus.Success then
         for _, waypoint in ipairs(path:GetWaypoints()) do
+            if not rootPart.Parent or not targetPart.Parent then return false end
             local expectedCFrame = CFrame.new(waypoint.Position.X, waypoint.Position.Y + 2, waypoint.Position.Z)
             local tween = TweenService:Create(rootPart, TweenInfo.new((rootPart.Position - waypoint.Position).Magnitude / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = expectedCFrame})
             tween:Play()
@@ -45,15 +56,15 @@ local function walkPathToTarget(rootPart, targetPart)
         end
         return true
     else
-        -- Cơ chế nhích nhẹ thông minh để tự gỡ kẹt vật lý
-        local nhichPos = rootPart.Position + Vector3.new(math.random(-4, 4), 0, math.random(-4, 4))
+        -- Cơ chế nhích nhẹ gỡ kẹt vật lý nếu bị chặn đường góc hẹp
+        local nhichPos = rootPart.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
         TweenService:Create(rootPart, TweenInfo.new(3 / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = CFrame.new(nhichPos.X, rootPart.Position.Y, nhichPos.Z)}):Play()
-        task.wait(0.3)
+        task.wait(0.2)
         return false
     end
 end
 
-print("[STAGE 3] Hệ thống quét thông minh bắt đầu hoạt động...")
+print("[STAGE 3] Đang định vị trạm điện sâu trong cấu trúc Power Plant...")
 local reached = false
 
 while not reached do
@@ -61,21 +72,23 @@ while not reached do
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
     if root then
-        local targetPowerBox = getNearestPowerBox(root.Position)
-        if targetPowerBox then
-            local distance = (root.Position - targetPowerBox.Position).Magnitude
+        local targetBox = getNearestPowerBox(root.Position)
+        if targetBox then
+            local distance = (root.Position - targetBox.Position).Magnitude
+            -- Nếu ở xa thì di chuyển lại gần trạm điện
             if distance > 4.5 then
-                walkPathToTarget(root, targetPowerBox)
+                walkPathToTarget(root, targetBox)
             else
-                print("[🎉 STAGE 3 SUCCESS] Đã tiếp cận thành công sát cạnh trạm điện!")
+                print("[🎉 STAGE 3 SUCCESS] Đã đứng sát cạnh mục tiêu sửa trạm điện!")
                 reached = true
             end
         else
-            -- Nếu chưa thấy (có thể do map chưa load kịp hoặc chưa xuất hiện), đợi 1 giây rồi quét lại
+            -- Nhật ký báo chờ map tải cấu trúc
+            print("[-] Đang quét tìm cấu trúc Power Box trong map...")
             task.wait(1)
         end
     end
     task.wait(0.1)
 end
 
-return true
+return true -- Trả về tín hiệu để file main của bạn lặp lại vòng lặp game!
