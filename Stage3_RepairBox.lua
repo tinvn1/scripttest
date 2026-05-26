@@ -1,11 +1,11 @@
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
 local localPlayer = game:GetService("Players").LocalPlayer
-local RUN_SPEED = 30 -- Cấu hình tốc độ chạy mong muốn
+local RUN_SPEED = 30 -- Tốc độ chạy nhanh
 
--- Khởi tạo Pathfinding với thông số chuẩn gốc của Roblox
+-- Khởi tạo Pathfinding với thông số chuẩn giúp tính toán đường đi mượt hơn
 local path = PathfindingService:CreatePath({
-    AgentRadius = 2, 
+    AgentRadius = 3, -- Tăng nhẹ bán kính để nhân vật cua góc rộng hơn, không bị quẹt tường
     AgentHeight = 5, 
     AgentCanJump = true
 })
@@ -37,76 +37,83 @@ local function getNearestPowerBox(rootPosition)
 end
 
 -- =========================================================================
--- HÀM DI CHUYỂN CHUẨN: TỰ CHẠY BẰNG MOVETO (TỐC ĐỘ 30) & PHÁT HIỆN KẸT
+-- 🔥 HÀM DI CHUYỂN CHẠY 1 MẠCH (KHÔNG KHỰNG, CHỐNG KẸT NÂNG CAO)
 -- =========================================================================
 local function walkPathToTarget(rootPart, humanoid, targetPart)
     if not rootPart or not targetPart or not targetPart.Parent then return false end
     
-    -- Tính toán đường đi từ vị trí hiện tại đến trạm điện
     local success, err = pcall(function()
         path:ComputeAsync(rootPart.Position, targetPart.Position)
     end)
     
     if success and path.Status == Enum.PathStatus.Success then
         local waypoints = path:GetWaypoints()
+        local totalWaypoints = #waypoints
         
         for i, waypoint in ipairs(waypoints) do
             if not rootPart.Parent or not targetPart.Parent then return false end
             
-            -- Đảm bảo nhân vật luôn giữ tốc độ chạy là 30 suốt quãng đường
+            -- Luôn ép tốc độ chạy là 30
             if humanoid.WalkSpeed ~= RUN_SPEED then
                 humanoid.WalkSpeed = RUN_SPEED
             end
             
-            -- Kiểm tra hành động nếu hệ thống yêu cầu nhảy
+            -- Tự động nhảy trước nếu hệ thống yêu cầu
             if waypoint.Action == Enum.PathWaypointAction.Jump then
                 humanoid.Jump = true
             end
             
-            -- Ra lệnh cho Humanoid tự chạy tới vị trí điểm nút tiếp theo
+            -- Phát lệnh chạy đến điểm hiện tại
             humanoid:MoveTo(waypoint.Position)
             
-            local movedToFinished = false
+            -- Bộ theo dõi chống kẹt
             local startPos = rootPart.Position
             local startTime = os.clock()
+            local loopTimeout = os.clock()
             
-            -- Kết nối sự kiện khi chạy tới đích điểm nút thành công
-            local connection
-            connection = humanoid.MoveToFinished:Connect(function(reachedTarget)
-                movedToFinished = true
-                connection:Disconnect()
-            end)
-            
-            -- Vòng lặp kiểm tra chống kẹt thời gian thực (Đã tối ưu cho tốc độ 30)
-            while not movedToFinished do
-                -- Vì chạy với tốc độ 30 (nhanh hơn), ta kiểm tra kẹt mỗi 0.35 giây
-                if (os.clock() - startTime) > 0.35 then
-                    -- Nếu chạy tốc độ 30 mà trong 0.35s di chuyển không quá 2.5 stud nghĩa là bị vướng
-                    if (rootPart.Position - startPos).Magnitude < 2.5 then
-                        print("[⚠️ STAGE 3] Phát hiện chạy bị kẹt vật cản! Tự động nhảy bọc lót...")
+            -- VÒNG LẶP CHẠY 1 MẠCH: Chuyển điểm sớm khi đến gần, không đợi dừng chân
+            while true do
+                local currentDist = (rootPart.Position - waypoint.Position).Magnitude
+                
+                -- NẾU LÀ ĐIỂM CUỐI CÙNG: Phải chạy sát sạt (< 3 stud)
+                if i == totalWaypoints then
+                    if currentDist < 3 then break end
+                -- NẾU LÀ ĐIỂM TRUNG GIAN: Gần đến nơi (< 4.5 stud) là gối đầu sang điểm sau luôn để chạy 1 mạch
+                else
+                    if currentDist < 4.5 then break end
+                end
+                
+                -- KIỂM TRA CHỐNG KẸT (Cứ mỗi 0.25 giây kiểm tra di chuyển)
+                if (os.clock() - startTime) > 0.25 then
+                    -- Nếu chạy tốc độ 30 mà trong 0.25s không tiến thêm được 2 stud chứng tỏ bị kẹt rào
+                    if (rootPart.Position - startPos).Magnitude < 2 then
+                        print("[⚠️ STAGE 3] Phát hiện kẹt rào/vật cản! Nhảy bọc lót chạy tiếp...")
+                        humanoid.Jump = true
                         
-                        humanoid.Jump = true -- Ép nhân vật nhảy lên vượt rào
-                        
-                        -- Nhấc nhẹ vị trí lên trên và hướng về phía trước để giải thoát khỏi điểm kẹt
+                        -- Nhấc nhẹ góc để phóng qua vật cản
                         local lookDirection = (waypoint.Position - rootPart.Position).Unit
                         rootPart.CFrame = rootPart.CFrame + Vector3.new(lookDirection.X * 1.5, 3.2, lookDirection.Z * 1.5)
                         
-                        -- Tiếp tục lệnh di chuyển đến điểm nút
                         humanoid:MoveTo(waypoint.Position)
                     end
                     startTime = os.clock()
                     startPos = rootPart.Position
                 end
-                task.wait(0.05)
+                
+                -- Bẫy lỗi quá thời gian (Nếu kẹt quá 4 giây ở 1 waypoint thì bỏ qua)
+                if (os.clock() - loopTimeout) > 4 then
+                    break
+                end
+                
+                task.wait() -- Vòng lặp chạy cực nhanh theo khung hình để bắt khoảng cách chính xác
             end
-            task.wait(0.01)
         end
         return true
     else
-        -- Dự phòng nếu không tìm thấy đường đi (Hồi sinh lỗi vị trí)
+        -- Dự phòng nếu lỗi tính toán đường đi
         local nhichPos = rootPart.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
         rootPart.CFrame = CFrame.new(nhichPos.X, rootPart.Position.Y + 1.5, nhichPos.Z)
-        task.wait(0.3)
+        task.wait(0.2)
         return false
     end
 end
@@ -114,7 +121,7 @@ end
 -- =========================================================================
 -- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3
 -- =========================================================================
-print("[STAGE 3] Bắt đầu xử lý luồng chạy bộ định vị trạm điện (Tốc độ: 30)...")
+print("[STAGE 3] Kích hoạt luồng CHẠY 1 MẠCH tới trạm điện (Speed 30)...")
 local reached = false
 
 while not reached do
@@ -123,7 +130,6 @@ while not reached do
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
     
     if root and humanoid then
-        -- Gán tốc độ 30 ngay từ vòng lặp chính
         if humanoid.WalkSpeed ~= RUN_SPEED then
             humanoid.WalkSpeed = RUN_SPEED
         end
@@ -131,22 +137,22 @@ while not reached do
         local targetBox = getNearestPowerBox(root.Position)
         if targetBox then
             local distance = (root.Position - targetBox.Position).Magnitude
-            -- Nếu cách trạm điện xa hơn 4.5 stud thì tiếp tục chạy bộ
+            -- Nếu cách xa hơn 4.5 stud thì kích hoạt luồng chạy mượt
             if distance > 4.5 then
                 walkPathToTarget(root, humanoid, targetBox)
             else
-                print("[🎯 STAGE 3 SUCCESS] Đã đến vị trí đích sát cạnh trạm điện!")
+                print("[🎯 STAGE 3 SUCCESS] Đã cập bến sát cạnh trạm điện thành công!")
                 reached = true
             end
         else
-            task.wait(1)
+            task.wait(0.5)
         end
     end
-    task.wait(0.1)
+    task.wait(0.05)
 end
 
-task.wait(1)
+task.wait(0.5)
 
--- 🔥 CHUYỂN GIAO: Kích hoạt Stage 4 thực hiện hành động đè nút sửa máy
+-- 🔥 CHUYỂN GIAO LUỒNG SANG STAGE 4
 _G.CurrentStage = 4
 return true
