@@ -4,15 +4,15 @@ local PathfindingService = game:GetService("PathfindingService")
 local localPlayer = game:GetService("Players").LocalPlayer
 local TWEEN_SPEED = 30
 
--- Cấu hình Pathfinding tối ưu né vật cản xung quanh khu vực nghĩa trang
+-- Khởi tạo Pathfinding với thông số chuẩn gốc của Roblox
 local path = PathfindingService:CreatePath({
-    AgentRadius = 2.5, 
+    AgentRadius = 2, 
     AgentHeight = 5, 
     AgentCanJump = true
 })
 
 -- =========================================================================
--- HÀM TÌM TRẠM ĐIỆN THEO ĐÚNG CẤU TRÚC MAP
+-- HÀM ĐỊNH VỊ TRẠM ĐIỆN THEO ĐÚNG CẤU TRÚC MAP
 -- =========================================================================
 local function getNearestPowerBox(rootPosition)
     local nearestBoxPart = nil
@@ -38,20 +38,23 @@ local function getNearestPowerBox(rootPosition)
 end
 
 -- =========================================================================
--- HÀM DI CHUYỂN CÓ CƠ CHẾ TỰ ĐỘNG NHẢY KHI VƯỚNG HÀNG RÀO SẮT
+-- HÀM DI CHUYỂN CHUẨN: SỬ DỤNG VỊ TRÍ ĐỂ DI CHUYỂN VÀ TỰ NHẢY KHI KẸT RÀO
 -- =========================================================================
 local function walkPathToTarget(rootPart, humanoid, targetPart)
     if not rootPart or not targetPart or not targetPart.Parent then return false end
     
-    path:ComputeAsync(rootPart.Position, targetPart.Position)
+    -- Tính toán đường đi từ vị trí hiện tại đến trạm điện
+    local success, err = pcall(function()
+        path:ComputeAsync(rootPart.Position, targetPart.Position)
+    end)
     
-    if path.Status == Enum.PathStatus.Success then
+    if success and path.Status == Enum.PathStatus.Success then
         local waypoints = path:GetWaypoints()
         
         for i, waypoint in ipairs(waypoints) do
             if not rootPart.Parent or not targetPart.Parent then return false end
             
-            -- 🔥 ĐÃ VÁ LỖI CÚ PHÁP: Sử dụng đúng Enum.PathWaypointAction của Roblox
+            -- Kiểm tra hành động nếu hệ thống yêu cầu nhảy
             if waypoint.Action == Enum.PathWaypointAction.Jump then
                 humanoid.Jump = true
             end
@@ -59,6 +62,7 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
             local startPos = rootPart.Position
             local expectedCFrame = CFrame.new(waypoint.Position.X, waypoint.Position.Y + 2, waypoint.Position.Z)
             
+            -- Tạo luồng di chuyển mượt mà tới điểm nút tiếp theo
             local tween = TweenService:Create(rootPart, TweenInfo.new((rootPart.Position - waypoint.Position).Magnitude / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = expectedCFrame})
             tween:Play()
             
@@ -69,40 +73,40 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
                 connection:Disconnect()
             end)
             
-            -- Bộ kiểm tra thời gian thực chống kẹt tại hàng rào
+            -- Vòng lặp kiểm tra thời gian thực xem có bị vướng hàng rào sắt nghĩa trang không
             local startTime = os.clock()
             while not tweenCompleted do
-                -- Nếu đứng im tại một chỗ quá 0.3 giây tức là đang vướng hàng rào sắt
+                -- Nếu đứng im một chỗ quá 0.3 giây tức là đang vướng rào
                 if (os.clock() - startTime) > 0.3 and (rootPart.Position - startPos).Magnitude < 1 then
-                    print("[⚠️ DETECTION] Vướng vật cản nghĩa trang! Kích hoạt bổ trợ nhảy vượt rào...")
+                    print("[⚠️ STAGE 3] Phát hiện kẹt rào nghĩa trang! Tự động nhảy bọc lót...")
                     
-                    humanoid.Jump = true
+                    humanoid.Jump = true -- Ra lệnh nhảy
                     
-                    -- Nhấc bổng nhân vật vượt qua lưới sắt bảo vệ
+                    -- Nhấc nhẹ nhân vật vượt lên trên và đẩy ra trước để phóng qua hàng rào
                     local lookDirection = (waypoint.Position - rootPart.Position).Unit
-                    rootPart.CFrame = rootPart.CFrame + Vector3.new(lookDirection.X * 1.5, 3, lookDirection.Z * 1.5)
+                    rootPart.CFrame = rootPart.CFrame + Vector3.new(lookDirection.X * 1.5, 3.5, lookDirection.Z * 1.5)
                     
                     tween:Cancel()
                     break
                 end
                 task.wait(0.05)
             end
-            
             task.wait(0.01)
         end
         return true
     else
-        local nhichPos = rootPart.Position + Vector3.new(math.random(-4, 4), 0, math.random(-4, 4))
-        TweenService:Create(rootPart, TweenInfo.new(3 / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = CFrame.new(nhichPos.X, rootPart.Position.Y + 2, nhichPos.Z)}):Play()
+        -- Bẫy lỗi dự phòng nếu không tìm thấy đường (ví dụ bị kẹt trong góc khuất)
+        local nhichPos = rootPart.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
+        rootPart.CFrame = CFrame.new(nhichPos.X, rootPart.Position.Y + 2, nhichPos.Z)
         task.wait(0.3)
         return false
     end
 end
 
 -- =========================================================================
--- LUỒNG CHẠY CHÍNH CỦA STAGE 3
+-- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3
 -- =========================================================================
-print("[STAGE 3] Đang định vị trạm điện an toàn từ hệ thống Power Plant...")
+print("[STAGE 3] Bắt đầu xử lý luồng định vị trạm điện...")
 local reached = false
 
 while not reached do
@@ -114,10 +118,11 @@ while not reached do
         local targetBox = getNearestPowerBox(root.Position)
         if targetBox then
             local distance = (root.Position - targetBox.Position).Magnitude
+            -- Nếu cách trạm điện xa hơn 4.5 stud thì tiếp tục di chuyển
             if distance > 4.5 then
                 walkPathToTarget(root, humanoid, targetBox)
             else
-                print("[🎉 STAGE 3 SUCCESS] Đã đến sát cạnh trạm điện an toàn!")
+                print("[🎯 STAGE 3 SUCCESS] Đã đến vị trí đích sát cạnh trạm điện!")
                 reached = true
             end
         else
@@ -127,6 +132,8 @@ while not reached do
     task.wait(0.1)
 end
 
--- Chuyển tiếp luồng an toàn sang Stage 4 để đè nút sửa máy
+task.wait(1)
+
+-- 🔥 CHUYỂN GIAO: Kích hoạt Stage 4 thực hiện hành động đè nút sửa máy
 _G.CurrentStage = 4
 return true
