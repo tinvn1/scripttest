@@ -84,6 +84,6 @@ while cycle <= 2 do
 end
 
 print("[STAGE 1] HOÀN THÀNH!")
-return true
 -- Thêm vào cuối file ngay sau khi nhặt đủ 2 xăng để kích hoạt nạp Stage 2
 _G.CurrentStage = 2
+return true
