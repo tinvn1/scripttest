@@ -1,29 +1,33 @@
-print("[⚔️ SYSTEM] Khởi động Auto Equip cho vũ khí: Bat...")
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+local WEAPON_NAME = "Bat"
 
--- Biến công tắc toàn cục
-if _G.AllowAutoEquip == nil then _G.AllowAutoEquip = true end
-
-local localPlayer = game:GetService("Players").LocalPlayer
-local hasEquipped = false -- Công tắc trạng thái chạy 1 lần
-
-task.spawn(function()
-    while not hasEquipped do
-        -- Nếu công tắc bị tắt (từ Stage 5), vòng lặp này sẽ bỏ qua
-        if _G.AllowAutoEquip then
-            local char = localPlayer.Character
-            local backpack = localPlayer:FindFirstChild("Backpack")
-            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if char and backpack and humanoid and humanoid.Health > 0 then
-                -- Tìm đúng vũ khí có tên là "Bat"
-                local weapon = backpack:FindFirstChild("Bat")
-                if weapon then
-                    humanoid:EquipTool(weapon)
-                    hasEquipped = true -- Khóa lại, không quét nữa
-                    print("[⚔️] Đã cầm Bat thành công, khóa Auto Equip.")
-                end
+local function equipWeapon()
+    pcall(function()
+        local char = localPlayer.Character
+        if not char then return end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local backpack = localPlayer:FindFirstChild("Backpack")
+        
+        if humanoid and backpack and not char:FindFirstChild(WEAPON_NAME) then
+            local weapon = backpack:FindFirstChild(WEAPON_NAME)
+            if weapon and weapon:IsA("Tool") then
+                humanoid:EquipTool(weapon)
+                print("[⚔️] Đã trang bị " .. WEAPON_NAME .. " thành công!")
             end
         end
-        task.wait(1)
-    end
+    end)
+end
+
+print("[⚔️ SYSTEM] Đã kích hoạt luồng tự động cầm vũ khí 1 lần duy nhất!");
+
+-- Chạy ngay lập tức 1 lần khi script khởi động
+equipWeapon()
+
+-- Khi nhân vật hồi sinh, tự động trang bị lại 1 lần duy nhất
+localPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    equipWeapon()
 end)
+
+return true
