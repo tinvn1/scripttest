@@ -38,14 +38,14 @@ print("[🖱️] Đã khóa mục tiêu khối Prompt thành công: " .. promptP
 local repairStarted = true
 local startTime = os.clock()
 
+-- Luồng tương tác liên tục ( Spam click / giữ / touch )
 task.spawn(function()
-    local char = localPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    
     while repairStarted do
+        local char = localPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        
         if promptPart and promptPart.Parent then
             if root and root.Parent then
-                -- FIXED: Removed undefined variable 'i' from Vector3
                 root.CFrame = CFrame.new(promptPart.Position + Vector3.new(0, 1, 1)) * CFrame.Angles(0, 0, 0)
             end
 
@@ -69,17 +69,27 @@ task.spawn(function()
     end
 end)
 
-while (os.clock() - startTime) < 16 do
+--- NÂNG CẤP LOGIC GIỮ LẠI ĐỂ NHẬN KIM CƯƠNG ---
+local maxWaitTime = 16 -- Thời gian sửa máy tối đa
+local bonusDelay = 1.5 -- Thời gian "đợi thêm" sau khi biến mất để chắc chắn nhận kim cương
+local promptDisappeared = false
+
+while (os.clock() - startTime) < maxWaitTime do
     if not promptPart or not promptPart.Parent then
-        print("[🎯 STAGE 4 SUCCESS] Khối Prompt biến mất sớm. Sửa máy thành công!")
-        break
+        if not promptDisappeared then
+            print("[💎 INSURANCE] Prompt đã biến mất! Giữ lại luồng 1.5 giây để đợi Server trả Kim Cương...")
+            promptDisappeared = true
+            task.wait(bonusDelay) -- Đợi thêm 1.5 giây bảo hiểm
+            break
+        end
     end
     RunService.Heartbeat:Wait()
 end
 
+-- Tắt luồng sửa máy
 repairStarted = false
-print("[🎯 STAGE 4 SUCCESS] Hoàn tất thời gian sửa máy quy định!")
+print("[🎯 STAGE 4 SUCCESS] Hoàn tất thời gian sửa máy và nhận thưởng!")
 
-task.wait(0.2)
+task.wait(0.5)
 _G.CurrentStage = 5
 return true
