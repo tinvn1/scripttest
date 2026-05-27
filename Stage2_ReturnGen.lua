@@ -59,31 +59,6 @@ if root then
             tweenToGenerator(root, genPart)
         end
         
-        -- 2. Thực hiện hành động tương tác đổ xăng vào máy
-        local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
-        if prompt then
-            fireproximityprompt(prompt)
-        else
-            root.CFrame = CFrame.new(genPart.Position) -- Ép chạm vật lý để nạp đồ
-        end
-        
-        task.wait(0.8) -- Chờ game xử lý cập nhật trạng thái nhận vật phẩm
-        
-        -- 3. 🔥 ĐIỀU KIỆN QUYẾT ĐỊNH RẼ NHÁNH LUỒNG
-        if isGeneratorFullyLoaded(genPart) then
-            -- Trường hợp ĐỦ ĐỒ -> Chuyển giao thẳng lên Stage 3
-            print("[🎯 STAGE 2 SUCCESS] Đã xác nhận đủ 2 Fuse/Fuel trên máy phát điện!")
-            task.wait(0.2)
-            _G.CurrentStage = 3
-            return true
-        else
-            -- Trường hợp THIẾU ĐỒ -> Quay đầu chạy lại Stage 1 ngay lập tức
-            print("[⚠️ STAGE 2 FAILED] Máy chưa đủ 2 bình xăng! Tự động kích hoạt lại Stage 1 để đi tìm kiếm tiếp...")
-            task.wait(0.2)
-            _G.CurrentStage = 1
-            return false
-        end
-    else
         -- Nếu không tìm thấy máy, quay lại Stage 1 quét tài nguyên tránh treo acc
         print("[⚠️] Không tìm thấy máy phát điện, trả luồng về Stage 1...")
         _G.CurrentStage = 1
