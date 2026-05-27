@@ -20,15 +20,6 @@ end
 -- =========================================================================
 -- 🔥 HÀM KIỂM TRA MÁY (TỐI GIẢN)
 -- =========================================================================
-local function isGeneratorFullyLoaded(genPart)
-    if not genPart then return false end
-    -- Chỉ kiểm tra ProximityPrompt để xem máy còn nhận đồ không
-    local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
-    if prompt and not prompt.Enabled then
-        return true
-    end
-    return false
-end
 
 -- =========================================================================
 -- 🔥 HÀM DI CHUYỂN
