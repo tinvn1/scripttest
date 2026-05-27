@@ -1,17 +1,18 @@
-if not game:IsLoaded() then 
-    game.Loaded:Wait() 
+-- Chờ trò chơi tải xong xuôi
+if not game:IsLoaded() then
+    game.Loaded:Wait()
 end
 
--- 🕒 Ghi lại mốc thời gian bắt đầu chạy Script
+-- 🕒 Ghi lại mốc thời gian bắt đầu chạy Script (Tính bằng os.clock chính xác cao)
 local startTimeGlobal = os.clock()
-local isForcedRejoining = false 
+local isForcedRejoining = false -- Biến trạng thái chặn chạy tiếp khi đang Rejoin
 
-print("[⚡ SYSTEM] Khởi động Main Loader - Tự động đồng bộ cấu hình ZHUB thực tế!");
+print("[⚡ SYSTEM] Khởi động Main Loader Update Mới Nhất - Đồng bộ Stage 0 & Chống lỗi dây chuyền!");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
 -- =========================================================================
--- ⏱️ LUỒNG ÉP REJOIN KHẨN CẤP ĐÚNG 2 PHÚT
+-- ⏱️ LUỒNG ÉP REJOIN KHẨN CẤP ĐÚNG 2 PHÚT (CHẠY SONG SONG)
 -- =========================================================================
 task.spawn(function()
     local TeleportService = game:GetService("TeleportService")
@@ -20,9 +21,11 @@ task.spawn(function()
 
     while not isForcedRejoining do
         local elapsed = os.clock() - startTimeGlobal
+        
+        -- 🔥 Nếu quá mốc 2 phút (120 giây) -> Ép Rejoin server mới lập tức để tránh treo máy
         if elapsed >= 120 then
             isForcedRejoining = true
-            print("[⚠️ TIMEOUT] Quá 2 phút! Kích hoạt Rejoin Server mới...");
+            print("[⚠️ TIMEOUT] Đã chạm mốc 2 phút khẩn cấp! Đang ép Rejoin...");
             
             local PlayerGui = localPlayer:WaitForChild("PlayerGui")
             for _, obj in pairs(PlayerGui:GetDescendants()) do
@@ -51,7 +54,7 @@ task.spawn(function()
     end
 end)
 
--- Hàm nạp file từ GitHub
+-- Hàm nạp file từ GitHub có sửa lỗi ký tự hệ thống tự động
 local function runFile(fileName)
     if isForcedRejoining then return end
 
@@ -76,97 +79,134 @@ local function runFile(fileName)
 end
 
 -- =========================================================================
--- 🛡️ GIAI ĐOẠN ZHUB: TỰ ĐỘNG KHÓA VÀ BẬT "KILL AURA" & "AUTO DRAG" (BẢN VÁ THỰC TẾ)
+-- 🛡️ STAGE 0: LUỒNG ZHUB TỰ ĐỘNG LẬT TAB BẬT KILL AURA VÀ AUTO DRAG
 -- =========================================================================
 task.spawn(function()
-    -- Nạp ZHUB gốc độc lập để không ảnh hưởng luồng chính
-    pcall(function()
+    print("[🚀 STAGE 0] Đang tải Menu ZHUB phụ trợ từ Github...")
+
+    -- 1. Tải ZHUB (Bọc pcall để cách ly hoàn toàn lỗi framework Knit ngoại lai)
+    local successLoad, errLoad = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
     end)
-    
-    -- Đợi UI của ZHUB xuất hiện ổn định trong hệ thống
-    task.wait(2)
-    
-    pcall(function()
-        local Players = game:GetService("Players")
-        local player = Players.LocalPlayer
-        local targetGui = game:GetService("CoreGui"):FindFirstChild("ZHUB") or player.PlayerGui:FindFirstChild("ZHUB")
-        
-        if not targetGui then 
-            warn("[⚠️ ZHUB] Không tìm thấy GUI hiển thị của ZHUB!")
-            return 
-        end
-        
-        -- Hàm giả lập click chuẩn bọc lót mọi Exploit
-        local function forceClick(button)
-            if not button then return end
-            if getconnections then
-                local clicked = false
-                for _, connection in pairs(getconnections(button.MouseButton1Click)) do 
-                    connection:Fire() 
-                    clicked = true
-                end
-                if not clicked then button:Fire() end
-            else
-                button.MouseButton1Click:Fire()
-            end
-        end
 
-        print("[⚙️ ZHUB] Tiến hành quét cấu hình giao diện UI thực tế...")
+    if not successLoad then
+        warn("[⚠️ STAGE 0] Không thể tải ZHUB từ Github: " .. tostring(errLoad))
+    end
 
-        -- 1. 🔍 BẬT CHỨC NĂNG AUTO DRAG
-        local autoDragTab = nil
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextButton") and string.find(v.Name, "Auto Drag") then
-                autoDragTab = v
-                break
-            end
-        end
-        if autoDragTab then 
-            forceClick(autoDragTab) 
-            task.wait(0.2)
-        end
+    -- 2. Đợi giao diện Menu xuất hiện
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+    local targetGui = nil
 
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") and v.Text == "Auto Drag" then
-                local container = v.Parent
-                if container then
-                    -- Tìm nút gạt (ImageButton hoặc TextButton) ở cạnh nhãn chữ
-                    local toggle = container:FindFirstChildOfClass("ImageButton") or container:FindFirstChildOfClass("TextButton")
-                    if toggle then
-                        forceClick(toggle)
-                        print("[✔️ ZHUB] Đã tự động kích hoạt: Auto Drag!")
+    for i = 1, 20 do
+        targetGui = game:GetService("CoreGui"):FindFirstChild("ZHUB") or player.PlayerGui:FindFirstChild("ZHUB") or game:GetService("CoreGui"):FindFirstChildOfClass("ScreenGui")
+        if targetGui then break end
+        task.wait(0.5)
+    end
+
+    -- Hàm giả lập click chuột chuẩn bọc lót getconnections
+    local function clickButton(btn)
+        if btn then
+            local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
+            for _, event in ipairs(events) do
+                if btn[event] then
+                    if getconnections then
+                        local fired = false
+                        for _, connection in pairs(getconnections(btn[event])) do
+                            connection:Fire()
+                            fired = true
+                        end
+                        if not fired then btn[event]:Fire() end
+                    else
+                        btn[event]:Fire()
                     end
                 end
             end
         end
+    end
 
-        -- 2. 🔍 BẬT CHỨC NĂNG KILL AURA
-        local combatTab = nil
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextButton") and (v.Name == "Combat" or (v:FindFirstChildOfClass("TextLabel") and v:FindFirstChildOfClass("TextLabel").Text == "Combat")) then
-                combatTab = v
-                break
+    -- 3. Thực hiện lật Tab vật lý tuần tự để hiện nút và kích hoạt
+    local configSuccess = pcall(function()
+        task.wait(2.5) -- Chờ UI kết xuất hoàn chỉnh cấu trúc ban đầu
+        
+        if targetGui then
+            ---------------------------------------------------------------------------
+            -- NẤC 1: BẤM TAB CHỨA DRAG & BẬT AUTO DRAG
+            ---------------------------------------------------------------------------
+            local dragTabBtn = nil
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and (string.find(v.Text, "Drag") or string.find(v.Text, "Main") or string.find(v.Text, "Misc")) then
+                    dragTabBtn = v:FindFirstAncestorOfClass("TextButton") or v:FindFirstAncestorOfClass("ImageButton") or v.Parent
+                    break
+                end
             end
-        end
-        if combatTab then 
-            forceClick(combatTab)
-            task.wait(0.2)
-        end
+            
+            if dragTabBtn then
+                clickButton(dragTabBtn)
+                task.wait(0.4) -- Đợi lật giao diện mở danh sách nút ẩn
+            end
 
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") and v.Text == "Kill Aura" then
-                local container = v.Parent
-                if container then
-                    local toggle = container:FindFirstChildOfClass("ImageButton") or container:FindFirstChildOfClass("TextButton")
-                    if toggle then
-                        forceClick(toggle)
-                        print("[✔️ ZHUB] Đã tự động kích hoạt: Kill Aura!")
+            if getgenv().Flags then
+                if getgenv().Flags["Auto Drag"] ~= nil then getgenv().Flags["Auto Drag"]:Set(true)
+                elseif getgenv().Flags["AutoDrag"] ~= nil then getgenv().Flags["AutoDrag"]:Set(true) end
+            end
+            
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Text == "Auto Drag" then
+                    local p = v.Parent
+                    if p then
+                        local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton") or p.Parent:FindFirstChildOfClass("TextButton")
+                        if toggleBtn then 
+                            clickButton(toggleBtn)
+                            print("[✔️ ZHUB] Đã click kích hoạt Auto Drag!")
+                            break
+                        end
+                    end
+                end
+            end
+            
+            task.wait(0.4)
+
+            ---------------------------------------------------------------------------
+            -- NẤC 2: BẤM TAB COMBAT & BẬT KILL AURA
+            ---------------------------------------------------------------------------
+            local combatTabBtn = nil
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Text == "Combat" then
+                    combatTabBtn = v:FindFirstAncestorOfClass("TextButton") or v:FindFirstAncestorOfClass("ImageButton") or v.Parent
+                    break
+                end
+            end
+            
+            if combatTabBtn then
+                clickButton(combatTabBtn)
+                task.wait(0.4) -- Đợi lật giao diện sang Tab Combat
+            end
+
+            if getgenv().Flags then
+                if getgenv().Flags["Kill Aura"] ~= nil then getgenv().Flags["Kill Aura"]:Set(true)
+                elseif getgenv().Flags["KillAura"] ~= nil then getgenv().Flags["KillAura"]:Set(true) end
+            end
+
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Text == "Kill Aura" then
+                    local row = v.Parent
+                    if row then
+                        local toggleBtn = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
+                        if toggleBtn then
+                            clickButton(toggleBtn)
+                            print("[✔️ ZHUB] Đã click kích hoạt Kill Aura!")
+                            break
+                        end
                     end
                 end
             end
         end
     end)
+
+    if not configSuccess then
+        warn("[⚠️ STAGE 0] Luồng ZHUB cấu hình gặp lỗi, tự động cô lập để chuyển Stage 1.")
+    end
 end)
 
 -- =========================================================================
@@ -177,14 +217,15 @@ task.spawn(function()
 end)
 
 -- =========================================================================
--- 🔄 DI CHUYỂN TUẦN TỰ QUA CÁC STAGE CHỐNG LỖI LOGIC DÂY CHUYỀN
+-- 🔄 HỆ THỐNG VẬN HÀNH TUẦN TỰ QUA CÁC STAGE GỐC (CHỐNG LỖI LOGIC)
 -- =========================================================================
+-- Chạy Stage 1 gom đủ xăng -> Tự kích hoạt rẽ sang Stage 2 -> Đạt điều kiện mở map rẽ sang Stage 3 chống kẹt
 runFile("Stage1_GetFuel.lua")   
 runFile("Stage2_ReturnGen.lua") 
 runFile("Stage3_RepairBox.lua") 
 
 -- =========================================================================
--- 🛠️ STAGE 4 VÀ STAGE 5 GỐC (HỢP NHẤT)
+-- 🛠️ STAGE 4 VÀ STAGE 5 (XỬ LÝ CUỐI TRẬN ĐỒNG BỘ CHUẨN)
 -- =========================================================================
 local function runOptimizedStage4()
     if isForcedRejoining then return end
