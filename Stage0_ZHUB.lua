@@ -3,21 +3,21 @@ if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
-print("[🚀 STAGE 0] Khởi động luồng SỬA LỖI - Ép lật Tab bật Auto Drag + Kill Aura...");
+print("[🚀 STAGE 0] Khởi động luồng ÉP BẬT ĐỒNG THỜI - Không lật trang!");
 
 -- Khởi chạy Menu ZHUB bằng pcall bảo vệ luồng chính
 pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
 end)
 
-task.wait(4) -- Đợi 4 giây để ZHUB nạp xong toàn bộ cấu trúc UI ban đầu
+task.wait(3.5) -- Đợi 3.5 giây để ZHUB nạp và dựng sẵn toàn bộ các thành phần nút bấm ngầm
 
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Hàm mô phỏng click chuột chuẩn sâu (Kích hoạt mọi liên kết ẩn của Executor)
-local function safeClick(button)
+-- Hàm mô phỏng kích hoạt nút bấm sâu, chọc thủng mọi lớp chặn bảo mật của UI Library
+local function forceClick(button)
     if not button then return end
     local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
     for _, event in ipairs(events) do
@@ -36,91 +36,17 @@ local function safeClick(button)
 end
 
 -- =========================================================================
--- 🔥 VÒNG LẶP TUẦN TỰ: ÉP MỞ TAB TRƯỚC -> KIỂM TRA BẬT NÚT SAU
+-- 🔥 VÒNG LẶP CÀN QUÉT SONG SONG: BẬT CÙNG LÚC 2 NÚT THẦN TỐC
 -- =========================================================================
-local dragActive = false
-local auraActive = false
-local maxLoops = 20
+local autoDragActivated = false
+local killAuraActivated = false
+local maxScanAttempts = 20
 
-for currentLoop = 1, maxLoops do
-    if dragActive and auraActive then break end
-    print(string.format("[🔄 ZHUB] Tiến hành đợt quét kích hoạt thứ %d/%d...", currentLoop, maxLoops))
+for scanRound = 1, maxScanAttempts do
+    if autoDragActivated and killAuraActivated then break end
+    print(string.format("[🔄 ZHUB PARALLEL] Đang quét ép bật song song đợt %d/%d...", scanRound, maxScanAttempts))
 
-    local locations = {CoreGui, PlayerGui}
-
-    -- -------------------------------------------------------------------------
-    -- 🚚 BƯỚC 1: ÉP MỞ CÁC TAB TIỀM NĂNG (MISC / MAIN / DRAG) ĐỂ TÌM AUTO DRAG
-    -- -------------------------------------------------------------------------
-    if not dragActive then
-        for _, area in ipairs(locations) do
-            for _, obj in pairs(area:GetDescendants()) do
-                if obj:IsA("TextLabel") and (obj.Text == "Misc" or obj.Text == "Main" or string.find(obj.Text, "Drag")) then
-                    local tabBtn = obj:FindFirstAncestorOfClass("TextButton") or obj:FindFirstAncestorOfClass("ImageButton") or obj.Parent
-                    if tabBtn and (tabBtn:IsA("TextButton") or tabBtn:IsA("ImageButton")) then
-                        safeClick(tabBtn) -- Bấm lật sang Tab này
-                    end
-                end
-            end
-        end
-        task.wait(0.5) -- Chờ nửa giây để giao diện lật kịp hiện các nút ẩn bên trong
-
-        -- Bắt đầu quét tìm nút "Auto Drag" sau khi đã lật Tab
-        for _, area in ipairs(locations) do
-            for _, obj in pairs(area:GetDescendants()) do
-                if obj:IsA("TextLabel") and (obj.Text == "Auto Drag" or string.find(obj.Text, "Auto Drag")) then
-                    local row = obj.Parent
-                    if row then
-                        local toggle = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
-                        if toggle then
-                            safeClick(toggle)
-                            dragActive = true
-                            print("[🎯 SUCCESS] Đã ép bật Auto Drag thành công!")
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    task.wait(0.3)
-
-    -- -------------------------------------------------------------------------
-    -- ⚔️ BƯỚC 2: ÉP MỞ TAB COMBAT ĐỂ TÌM VÀ BẬT KILL AURA
-    -- -------------------------------------------------------------------------
-    if not auraActive then
-        for _, area in ipairs(locations) do
-            for _, obj in pairs(area:GetDescendants()) do
-                if obj:IsA("TextLabel") and (obj.Text == "Combat" or string.find(obj.Text, "Combat")) then
-                    local tabBtn = obj:FindFirstAncestorOfClass("TextButton") or obj:FindFirstAncestorOfClass("ImageButton") or obj.Parent
-                    if tabBtn and (tabBtn:IsA("TextButton") or tabBtn:IsA("ImageButton")) then
-                        safeClick(tabBtn) -- Bấm lật sang Tab Combat
-                    end
-                end
-            end
-        end
-        task.wait(0.5) -- Chờ nửa giây để giao diện hiển thị các tính năng Combat
-
-        -- Bắt đầu quét tìm nút "Kill Aura" sau khi đã lật sang Tab Combat
-        for _, area in ipairs(locations) do
-            for _, obj in pairs(area:GetDescendants()) do
-                if obj:IsA("TextLabel") and (obj.Text == "Kill Aura" or string.find(obj.Text, "Kill Aura")) then
-                    local row = obj.Parent
-                    if row then
-                        local toggle = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
-                        if toggle then
-                            safeClick(toggle)
-                            auraActive = true
-                            print("[🎯 SUCCESS] Đã ép bật Kill Aura thành công!")
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- 🛑 Kích hoạt song song bằng Flags của Hub (Nếu thư viện UIX có đăng ký biến môi trường)
+    -- Kích hoạt bằng Flags hệ thống song song (Nếu ZHUB đăng ký biến môi trường toàn cục)
     if getgenv().Flags then
         pcall(function()
             if getgenv().Flags["Auto Drag"] then getgenv().Flags["Auto Drag"]:Set(true) end
@@ -130,9 +56,45 @@ for currentLoop = 1, maxLoops do
         end)
     end
 
-    task.wait(0.5) -- Đợi trước khi lặp lại vòng quét tiếp theo nếu có nút bị trượt
+    -- Càn quét vật lý toàn bộ khu vực CoreGui và PlayerGui cùng một lúc
+    local searchAreas = {CoreGui, PlayerGui}
+    for _, area in ipairs(searchAreas) do
+        for _, obj in pairs(area:GetDescendants()) do
+            if obj:IsA("TextLabel") then
+                
+                -- 🚚 Kiểm tra và ép kích hoạt mục "Auto Drag"
+                if not autoDragActivated and (obj.Text == "Auto Drag" or string.find(obj.Text, "Auto Drag")) then
+                    local row = obj.Parent
+                    if row then
+                        local toggleBtn = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
+                        if toggleBtn then
+                            forceClick(toggleBtn)
+                            autoDragActivated = true
+                            print("[✔️ SUCCESS] Đã ép bật đồng thời: Auto Drag!")
+                        end
+                    end
+                end
+
+                -- ⚔️ Kiểm tra và ép kích hoạt mục "Kill Aura"
+                if not killAuraActivated and (obj.Text == "Kill Aura" or string.find(obj.Text, "Kill Aura")) then
+                    local row = obj.Parent
+                    if row then
+                        local toggleBtn = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
+                        if toggleBtn then
+                            forceClick(toggleBtn)
+                            killAuraActivated = true
+                            print("[✔️ SUCCESS] Đã ép bật đồng thời: Kill Aura!")
+                        end
+                    end
+                end
+
+            end
+        end
+    end
+
+    task.wait(0.5) -- Nghỉ nửa giây rồi quét lại nếu có nút chưa nhận lệnh
 end
 
-print("[🚀] Stage 0 kết thúc mỹ mãn. Hệ thống tự động kích hoạt luồng Stage 1 đi nhặt xăng...");
+print("[🚀] Stage 0 hoàn tất cấu hình đồng thời cho ZHUB. Chuyển giao luồng sang Stage 1 nhặt Fuel...");
 _G.CurrentStage = 1
 return true
