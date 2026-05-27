@@ -67,7 +67,6 @@ local function runFile(fileName)
     end)
     
     if success and content then
-        -- Khắc phục lỗi chính tả hệ thống gốc của bạn
         content = string.gsub(content, "Enum%.PathJointAction", "Enum.PathWaypointAction")
         content = string.gsub(content, "PathJointAction", "PathWaypointAction")
         
@@ -184,73 +183,96 @@ runFile("Stage2_ReturnGen.lua")
 runFile("Stage3_RepairBox.lua") 
 
 -- =========================================================================
--- 🛠️ STAGE 4 VÀ STAGE 5 KHÔNG ĐỘ TRỄ (NẾU CHƯA QUÁ 2 PHÚT THÌ CHẠY TIẾP)
+-- 🛠️ STAGE 4: TỰ SỬA MÁY PHÁT ĐIỆN KHI TIẾP CẬN SÁT (KHÔNG LỖI ROBUX)
 -- =========================================================================
-
 local function runOptimizedStage4()
     if isForcedRejoining then return end
+    print("[🛠️ STAGE 4] Hệ thống Main chuyển giao luồng sửa máy phát điện...")
+    
+    task.wait(0.5) -- Cho game giải tỏa nghẽn mạng từ Stage 3 di chuyển
+
     local Workspace = game:GetService("Workspace")
-    local RunService = game:GetService("RunService")
     local localPlayer = game:GetService("Players").LocalPlayer
 
-    local function getPowerBoxPrompt()
+    -- Hàm tìm chính xác khối tương tác "Prompt" trong Power Box
+    local function getPowerBoxPromptPart()
         for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("ProximityPrompt") then
-                if obj.Parent and obj.Parent.Name == "Power Box" then return obj
-                elseif string.find(string.lower(obj.ObjectText), "power plant") or string.find(string.lower(obj.ActionText), "repair") then return obj end
+            if obj:IsA("Model") and obj.Name == "Power Box" then
+                local promptPart = obj:FindFirstChild("Prompt")
+                if promptPart and promptPart:IsA("BasePart") then
+                    return promptPart
+                end
             end
         end
         return nil
     end
 
-    local repairStarted = false
-    local startTime = os.clock()
-    local holdConnection = nil
+    local promptPart = nil
+    local checkAttempts = 0
 
-    local stage4Connection
-    stage4Connection = RunService.Heartbeat:Connect(function()
-        -- Kiểm tra nếu luồng tổng đếm giờ ra lệnh ép Rejoin thì lập tức hủy kết nối Stage 4
-        if isForcedRejoining then
-            stage4Connection:Disconnect()
-            return
+    -- Chủ động quét tìm khối Prompt (Quét tối đa 25 lần)
+    repeat
+        if isForcedRejoining then return end
+        promptPart = getPowerBoxPromptPart()
+        if not promptPart then
+            checkAttempts = checkAttempts + 1
+            task.wait(0.2)
         end
+    until promptPart or checkAttempts >= 25
 
-        local prompt = getPowerBoxPrompt()
-        if prompt then
-            if prompt.RequiresLineOfSight then prompt.RequiresLineOfSight = false end
-            if prompt.MaxActivationDistance < 15 then prompt.MaxActivationDistance = 25 end
+    if not promptPart then
+        warn("[❌ STAGE 4 ERROR] Không quét được khối Prompt! Buộc bỏ qua để sang Stage 5...")
+        return false
+    end
 
-            if not repairStarted then
-                repairStarted = true
-                startTime = os.clock()
-                
-                holdConnection = task.spawn(function()
-                    while repairStarted and prompt and prompt.Parent and not isForcedRejoining do
-                        if prompt.HoldDuration > 0 then prompt:InputHoldBegin() end
-                        fireproximityprompt(prompt)
-                        task.wait(0.04) 
-                    end
-                end)
-            end
+    print("[🖱️] Đã tìm thấy khối Prompt. Tiến hành giữ nút sửa máy an toàn...")
+
+    local repairStarted = true
+    local startTime = os.clock()
+
+    -- Luồng ép click/touch tương tác song song tần suất an toàn (0.25s) tránh hiện bảng Robux
+    task.spawn(function()
+        while repairStarted and promptPart and promptPart.Parent and not isForcedRejoining do
+            local char = localPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
             
-            if repairStarted and (os.clock() - startTime) >= 16 then
-                stage4Connection:Disconnect()
+            if root then
+                local cd = promptPart:FindFirstChildOfClass("ClickDetector") or promptPart.Parent:FindFirstChildOfClass("ClickDetector")
+                if cd and fireclickdetector then
+                    fireclickdetector(cd)
+                elseif promptPart:FindFirstChildOfClass("ProximityPrompt") and fireproximityprompt then
+                    fireproximityprompt(promptPart:FindFirstChildOfClass("ProximityPrompt"))
+                elseif firetouchinterest then
+                    firetouchinterest(root, promptPart, 0)
+                    task.wait(0.05)
+                    firetouchinterest(root, promptPart, 1)
+                end
             end
-        else
-            if repairStarted then stage4Connection:Disconnect() end
+            task.wait(0.25)
         end
     end)
 
-    while stage4Connection.Connected do task.wait() end
+    -- Vòng lặp đếm giờ chính xác 16 giây để hoàn thành Stage 4
+    while (os.clock() - startTime) < 16 and not isForcedRejoining do
+        if not promptPart or not promptPart.Parent then
+            print("[🎯 STAGE 4 SUCCESS] Khối Prompt biến mất sớm. Sửa thành công!")
+            break
+        end
+        task.wait(0.1)
+    end
 
     repairStarted = false
-    if holdConnection then task.cancel(holdConnection) end
-    local finalPrompt = getPowerBoxPrompt()
-    if finalPrompt then pcall(function() finalPrompt:InputHoldEnd() end) end
+    print("[🎯 STAGE 4 SUCCESS] Hoàn thành tiến trình Stage 4!");
+    task.wait(0.2)
 end
 
+-- =========================================================================
+-- 🚀 STAGE 5: ĐỢI NÚT PLAY AGAIN HOẶC ÉP ĐỔI SERVER SẠCH SẼ
+-- =========================================================================
 local function runOptimizedStage5()
     if isForcedRejoining then return end
+    print("[🚀 STAGE 5] Kích hoạt tiến trình kết thúc trận và Reset Server...");
+
     local Players = game:GetService("Players")
     local TeleportService = game:GetService("TeleportService")
     local RunService = game:GetService("RunService")
@@ -260,6 +282,7 @@ local function runOptimizedStage5()
     local foundButton = nil
     local startTime = os.clock()
     
+    -- Đợi tối đa 15 giây xem UI nút Kết thúc/Chơi lại có xuất hiện không
     while not foundButton and (os.clock() - startTime) < 15 and not isForcedRejoining do
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
@@ -273,12 +296,16 @@ local function runOptimizedStage5()
         RunService.Heartbeat:Wait()
     end
     
-    if foundButton and not isForcedRejoining then
+    -- Click nút và thực hiện đổi server ngay lập tức
+    if foundButton and not isForcedRejoining do
         if getconnections then
             for _, connection in pairs(getconnections(foundButton.MouseButton1Click)) do connection:Fire() end
         end
         foundButton.MouseButton1Click:Fire()
-        
+    end
+    
+    -- Teleport dọn dẹp nhảy sang server mới
+    if not isForcedRejoining then
         local teleportOptions = Instance.new("TeleportOptions")
         teleportOptions.ServerInstanceId = game.JobId
         pcall(function()
@@ -287,6 +314,8 @@ local function runOptimizedStage5()
     end
 end
 
--- Thực thi giai đoạn cuối bình thường nếu chưa bị quá giờ
+-- =========================================================================
+-- 🏃 CHẠY TUẦN TỰ CÁC GIAI ĐOẠN CUỐI
+-- =========================================================================
 runOptimizedStage4()
 runOptimizedStage5()
