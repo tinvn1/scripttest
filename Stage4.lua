@@ -1,9 +1,10 @@
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Dịch vụ giả lập phím vật lý
 local localPlayer = Players.LocalPlayer
 
-print("[🛠️ STAGE 4] Kích hoạt luồng sửa máy phát điện thế hệ mới...");
+print("[🛠️ STAGE 4] Kích hoạt luồng sửa máy phát điện thế hệ mới + Giả lập phím E vật lý...");
 task.wait(1.0) 
 
 local function getPowerBoxPromptPart()
@@ -38,7 +39,7 @@ print("[🖱️] Đã khóa mục tiêu khối Prompt thành công: " .. promptP
 local repairStarted = true
 local startTime = os.clock()
 
--- Luồng tương tác liên tục ( Spam click / giữ / touch )
+-- Luồng tương tác liên tục (Spam API + Giả lập giữ phím E vật lý)
 task.spawn(function()
     while repairStarted do
         local char = localPlayer.Character
@@ -49,6 +50,7 @@ task.spawn(function()
                 root.CFrame = CFrame.new(promptPart.Position + Vector3.new(0, 1, 1)) * CFrame.Angles(0, 0, 0)
             end
 
+            -- 1. Chạy các hàm API cũ để kích hoạt nhanh
             local prompt = promptPart:FindFirstChildOfClass("ProximityPrompt") or promptPart.Parent:FindFirstChildOfClass("ProximityPrompt")
             if prompt and fireproximityprompt then
                 fireproximityprompt(prompt)
@@ -64,12 +66,22 @@ task.spawn(function()
                 RunService.Heartbeat:Wait()
                 firetouchinterest(root, promptPart, 1)
             end
+
+            -- 2. TỰ ĐỘNG GIỮ NÚT E VẬT LÝ (Lớp bảo hiểm tối cao nếu API bị game chặn)
+            pcall(function()
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            end)
         end
         task.wait(0.1) 
     end
+
+    -- Giải phóng phím E khi ngừng sửa máy để nhân vật không bị kẹt nút
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
 end)
 
---- NÂNG CẤP LOGIC GIỮ LẠI ĐỂ NHẬN KIM CƯƠNG ---
+--- LOGIC GIỮ LẠI ĐỂ ĐẢM BẢO NHẬN KIM CƯƠNG ---
 local maxWaitTime = 16 -- Thời gian sửa máy tối đa
 local bonusDelay = 1.5 -- Thời gian "đợi thêm" sau khi biến mất để chắc chắn nhận kim cương
 local promptDisappeared = false
@@ -86,7 +98,7 @@ while (os.clock() - startTime) < maxWaitTime do
     RunService.Heartbeat:Wait()
 end
 
--- Tắt luồng sửa máy
+-- Tắt luồng sửa máy và nhả phím E vật lý
 repairStarted = false
 print("[🎯 STAGE 4 SUCCESS] Hoàn tất thời gian sửa máy và nhận thưởng!")
 
