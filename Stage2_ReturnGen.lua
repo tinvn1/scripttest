@@ -5,7 +5,7 @@ local localPlayer = game:GetService("Players").LocalPlayer
 local TWEEN_SPEED = 30
 
 -- =========================================================================
--- 🔥 HÀM ĐỊNH VỊ MÁY PHÁT ĐIỆN (ĐÃ LƯỢC BỎ MỌI LOGIC GARA)
+-- 🔥 HÀM ĐỊNH VỊ MÁY PHÁT ĐIỆN (QUÉT TOÀN BỘ MAP)
 -- =========================================================================
 local function getGenerator()
     for _, obj in pairs(Workspace:GetDescendants()) do
@@ -17,44 +17,7 @@ local function getGenerator()
 end
 
 -- =========================================================================
--- 🕵️‍♂️ CƠ CHẾ CHECK 2.5: DÒ BIẾN ĐỘNG NHỎ CỦA THẾ GIỚI
--- =========================================================================
-local function checkWorldUpdate(genPart)
-    if not genPart then return false end
-    
-    -- Lấy Model gốc chứa cục Part để lắng nghe các linh kiện bên trong
-    local genModel = genPart:IsA("Model") and genPart or genPart.Parent
-    local isUpdated = false
-    
-    print("[🕵️‍♂️ SPY 2.5] Bắt đầu đứng rình biến động nhỏ của máy...")
-    
-    -- Theo dõi đệ quy xem thế giới có cập nhật thêm/bớt vật thể gì bên trong máy không
-    local connAdd = genModel.DescendantAdded:Connect(function(descendant)
-        print("[⚡ SPY UPDATE]: Thế giới vừa thêm vật thể mới -> " .. descendant.Name)
-        isUpdated = true
-    end)
-    
-    local connRemove = genModel.DescendantRemoving:Connect(function(descendant)
-        print("[⚡ SPY UPDATE]: Thế giới vừa mất vật thể -> " .. descendant.Name)
-        isUpdated = true
-    end)
-    
-    -- Chờ tối đa 5 giây xem thế giới game có biến động gì không
-    local startTime = os.clock()
-    while (os.clock() - startTime) < 5 do
-        if isUpdated then break end
-        task.wait(0.1)
-    end
-    
-    -- Ngắt kết nối để giải phóng bộ nhớ, tránh bị lag/giật máy
-    connAdd:Disconnect()
-    connRemove:Disconnect()
-    
-    return isUpdated
-end
-
--- =========================================================================
--- 🔥 HÀM DI CHUYỂN
+-- 🔥 HÀM DI CHUYỂN TWEEN
 -- =========================================================================
 local function tweenToGenerator(rootPart, genPart)
     if not rootPart or not genPart then return false end
@@ -80,43 +43,76 @@ local function tweenToGenerator(rootPart, genPart)
 end
 
 -- =========================================================================
--- VÒNG LẶP ĐIỀU KHIỂN CHÍNH
+-- 🎮 VÒNG LẶP ĐIỀU KHIỂN CHÍNH (ĐÃ ĐƯA SPY 2.5 LÊN ĐẦU)
 -- =========================================================================
-print("[STAGE 2] Bắt đầu di chuyển đến máy phát điện...")
+print("[STAGE 2] Khởi động luồng kiểm tra Stage 2...")
 
-local char = localPlayer.Character
-local root = char and char:FindFirstChild("HumanoidRootPart")
-
-if root then
-    local genPart = getGenerator()
-    if genPart then
-        -- Tiến hành di chuyển tới máy
-        tweenToGenerator(root, genPart)
+local genPart = getGenerator()
+if genPart then
+    -- ---------------------------------------------------------------------
+    -- 🕵️‍♂️ [BƯỚC 1] KÍCH HOẠT NGAY LẬP TỨC CƠ CHẾ SPY 2.5 TRƯỚC KHI LÀM BẤT CỨ GÌ
+    -- ---------------------------------------------------------------------
+    local genModel = genPart:IsA("Model") and genPart or genPart.Parent
+    local hasVariableChange = false
+    
+    print("[🕵️‍♂️ SPY 2.5] Đang đứng rình biến số thế giới tại máy phát điện...")
+    
+    -- Lắng nghe xem thế giới game có nạp thêm hoặc xóa bớt vật thể/linh kiện nào của máy không
+    local connAdd = genModel.DescendantAdded:Connect(function(descendant)
+        print("[⚡ SPY DETECTED] Thế giới cập nhật biến số mới (Thêm): " .. descendant.Name)
+        hasVariableChange = true
+    end)
+    
+    local connRemove = genModel.DescendantRemoving:Connect(function(descendant)
+        print("[⚡ SPY DETECTED] Thế giới cập nhật biến số mới (Xóa): " .. descendant.Name)
+        hasVariableChange = true
+    end)
+    
+    -- Treo luồng chờ tối đa 4 giây để bắt trọn các cập nhật cấu trúc nhỏ của game
+    local startTime = os.clock()
+    while (os.clock() - startTime) < 4 do
+        if hasVariableChange then break end
+        task.wait(0.1)
+    end
+    
+    -- Ngắt kết nối ngay để giải phóng bộ nhớ, tránh rò rỉ và gây lag game
+    connAdd:Disconnect()
+    connRemove:Disconnect()
+    
+    -- ---------------------------------------------------------------------
+    -- 📊 [BƯỚC 2] XỬ LÝ KẾT QUẢ CHECK SPY
+    -- ---------------------------------------------------------------------
+    if hasVariableChange then
+        -- NẾU CÓ BIẾN SỐ TRUYỀN VỀ -> CHO PHÉP CHẠY TIẾP
+        print("[🎯 SPY SUCCESS] Phát hiện máy có biến số đổi cấu trúc! Tiến hành di chuyển...")
         
-        -- Kích hoạt nút tương tác (Prompt)
-        local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
-        if prompt then
-            fireproximityprompt(prompt)
-        end
+        local char = localPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
         
-        task.wait(0.5) -- Đợi hiệu ứng tương tác kích hoạt dữ liệu game
-        
-        -- KÍCH HOẠT CƠ CHẾ 2.5: ĐỨNG CHECK BIẾN ĐỘNG THẾ GIỚI TẠI MÁY
-        local hasChange = checkWorldUpdate(genPart)
-        
-        if hasChange then
-            -- ĐI TIẾP STAGE 3 NẾU CÓ THAY ĐỔI NHỎ XẢY RA
-            print("[🎯 STAGE 2 DONE] Phát hiện biến động thành công! Tiến hành lên Stage 3.")
+        if root then
+            -- Thực hiện di chuyển tới máy phát điện
+            tweenToGenerator(root, genPart)
+            task.wait(0.2)
+            
+            -- Bấm nút tương tác kích nổ tiến trình
+            local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genModel:FindFirstChildOfClass("ProximityPrompt")
+            if prompt then
+                fireproximityprompt(prompt)
+            end
+            task.wait(0.5)
+            
+            -- Đẩy Stage lên Stage 3 thành công
+            print("[🎯 STAGE 2 DONE] Tương tác hoàn tất! Lên Stage 3.")
             _G.CurrentStage = 3
-        else
-            -- PHẠT QUAY VỀ STAGE 1 NẾU MÁY IM LÌM KHÔNG ĐỔI TRẠNG THÁI
-            warn("[❌ STAGE 2 FAILED] Máy im lìm không cập nhật cấu trúc! PHẠT: Lùi về Stage 1.")
-            _G.CurrentStage = 1
         end
-        
-        return true
     else
-        print("[⚠️] Không thấy máy phát điện... Lùi về Stage 1.")
+        -- NẾU MÁY IM LÌM (KHÔNG CÓ BIẾN SỐ) -> PHẠT LẬP TỨC
+        warn("[❌ SPY FAILED] Không phát hiện bất kỳ biến số nào! PHẠT: Lùi thẳng về Stage 1.")
         _G.CurrentStage = 1
     end
+else
+    print("[⚠️] Không tìm thấy máy phát điện trong map... Quay về Stage 1.")
+    _G.CurrentStage = 1
 end
+
+return true
