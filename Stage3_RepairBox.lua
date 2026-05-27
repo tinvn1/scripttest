@@ -1,21 +1,17 @@
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
-local TweenService = game:GetService("TweenService")
 local localPlayer = game:GetService("Players").LocalPlayer
+local RUN_SPEED = 30 
 
--- 🏃‍♂️ KHAI BÁO TỐC ĐỘ DI CHUYỂN CỦA BẠN Ở ĐÂY
-local RUN_SPEED = 30    -- Tốc độ chạy bộ bình thường
-local TWEEN_SPEED = 32  -- Tốc độ lướt Tween dọc theo Waypoint để chống ôm tường
-
--- Khởi tạo Pathfinding cấu hình mở rộng bán kính tối đa để ép đường đi ra giữa lộ trình
+-- Tăng bán kính AgentRadius lên một chút để nhân vật đi rộng vòng qua các góc tường, chống cạ người vào cạnh cửa
 local path = PathfindingService:CreatePath({
-    AgentRadius = 3.5, -- Tăng mạnh bán kính né vật cản, buộc đường đi phải nằm xa rìa tường
-    AgentHeight = 5,
-    AgentCanJump = false -- Tắt Jump của hệ thống để chống kích hoạt nhảy bậy
+    AgentRadius = 2.2, 
+    AgentHeight = 5, 
+    AgentCanJump = true
 })
 
 -- =========================================================================
--- 🛠️ HÀM ĐỊNH VỊ TRẠM ĐIỆN THEO ĐÚNG CẤU TRÚC MAP
+-- HÀM ĐỊNH VỊ TRẠM ĐIỆN THEO ĐÚNG CẤU TRÚC MAP
 -- =========================================================================
 local function getNearestPowerBox(rootPosition)
     local nearestBoxPart = nil
@@ -41,89 +37,130 @@ local function getNearestPowerBox(rootPosition)
 end
 
 -- =========================================================================
--- 🚀 HÀM TWEEN DỌC THEO MẮT XÍCH WAYPOINT (CHỐNG ÔM TƯỜNG & CHỐNG KẸT TUYỆT ĐỐI)
+-- 🔥 HÀM DI CHUYỂN THUẦN CHẠY BỘ - KHÔNG TWEEN - GỠ KẸT BẰNG JUMP & RE-COMPUTE
 -- =========================================================================
-local function moveSmoothAlongPath(rootPart, targetPart)
+local function walkPathToTarget(rootPart, humanoid, targetPart)
+    if not rootPart or not targetPart or not targetPart.Parent then return false end
+    
     local success, err = pcall(function()
         path:ComputeAsync(rootPart.Position, targetPart.Position)
     end)
     
     if success and path.Status == Enum.PathStatus.Success then
         local waypoints = path:GetWaypoints()
+        local totalWaypoints = #waypoints
         
-        -- Duyệt qua từng tọa độ nút mà hệ thống vạch ra
-        for i = 2, #waypoints do
-            local wp = waypoints[i]
+        for i, waypoint in ipairs(waypoints) do
+            if not rootPart.Parent or not targetPart.Parent then return false end
             
-            -- Tọa độ đích nâng nhẹ lên 0.5 studs so với mặt đất để tránh ma sát chân vào ngách gạch
-            local targetCFrame = CFrame.new(wp.Position + Vector3.new(0, 0.5, 0))
-            local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+            -- Đảm bảo tốc độ chạy luôn giữ vững mức tối đa
+            if humanoid.WalkSpeed ~= RUN_SPEED then humanoid.WalkSpeed = RUN_SPEED end
             
-            -- 🎯 SỬ DỤNG TWEEN_SPEED ĐỂ TÍNH THỜI GIAN DI CHUYỂN MƯỢT MÀ
-            local duration = distance / TWEEN_SPEED
+            -- Kích hoạt nhảy nếu điểm nút yêu cầu vượt địa hình
+            if waypoint.Action == Enum.PathWaypointAction.Jump then 
+                humanoid.Jump = true 
+            end
             
-            local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-            local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = targetCFrame})
+            -- Ra lệnh chạy bộ thuần túy tới điểm nút
+            humanoid:MoveTo(waypoint.Position)
             
-            tween:Play()
-            tween.Completed:Wait() -- Chờ đi tới điểm nút này rồi mới chuyển sang nút tiếp theo
+            local startPos = rootPart.Position
+            local startTime = os.clock()
+            local loopTimeout = os.clock()
+            local isStuck = false
             
-            -- Kiểm tra an toàn: Nếu trong lúc đang đi mà đã áp sát trạm điện thì ngắt sớm luôn
-            if (rootPart.Position - targetPart.Position).Magnitude <= 4.5 then
-                return true
+            -- Vòng lặp kiểm tra tiến độ chạy bộ của nhân vật
+            while true do
+                local currentDist = (rootPart.Position - waypoint.Position).Magnitude
+                
+                -- Xử lý gối đầu mượt mà giữa các điểm nút
+                if i == totalWaypoints then
+                    if currentDist < 3 then break end
+                else
+                    if currentDist < 4.5 then break end 
+                end
+                
+                -- CẢM BIẾN THEO DÕI GỠ KẸT CHỈ DÙNG VẬT LÝ (KHÔNG TWEEN)
+                if (os.clock() - startTime) > 0.35 then
+                    local movedDistance = (rootPart.Position - startPos).Magnitude
+                    
+                    -- Nếu sau 0.35 giây di chuyển không nổi 1.5 stud chứng tỏ đang cạ vào tường/góc kẹt
+                    if movedDistance < 1.5 then
+                        humanoid.Jump = true -- Ép nhân vật thực hiện lệnh nhảy qua chướng ngại vật thấp
+                        
+                        -- Thay vì dịch chuyển CFrame, ép humanoid quay sang hướng khác di chuyển ngẫu nhiên một nhịp ngắn
+                        local escapeAngle = math.rad(math.random(0, 360))
+                        local escapeTarget = rootPart.Position + Vector3.new(math.sin(escapeAngle) * 4, 0, math.cos(escapeAngle) * 4)
+                        humanoid:MoveTo(escapeTarget)
+                        task.wait(0.25)
+                        
+                        isStuck = true -- Đánh dấu bị kẹt để tính lại lộ trình sạch
+                        break
+                    end
+                    
+                    startTime = os.clock()
+                    startPos = rootPart.Position
+                end
+                
+                -- Khóa bảo vệ tránh treo luồng tại một điểm nút quá lâu
+                if (os.clock() - loopTimeout) > 3.5 then 
+                    isStuck = true
+                    break 
+                end
+                
+                task.wait(0.02)
+            end
+            
+            -- Nếu bị kẹt, dừng ngay việc chạy theo danh sách nút cũ, ép tính toán lại sơ đồ đường đi mới hoàn toàn
+            if isStuck then 
+                break 
             end
         end
         return true
     else
-        -- Phương án dự phòng cuối: Nếu Pathfinding lỗi không tính được đường đi, bay thẳng 1 mạch tới đích
-        local distance = (rootPart.Position - targetPart.Position).Magnitude
-        local duration = distance / TWEEN_SPEED
-        local tween = TweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetPart.CFrame + Vector3.new(0, 1.5, 0)})
-        tween:Play()
-        tween.Completed:Wait()
+        -- Nếu Pathfinding thất bại do map thay đổi, ép nhân vật nhảy và đi lùi một nhịp để tìm góc quét thông thoáng hơn
+        humanoid.Jump = true
+        humanoid:MoveTo(rootPart.Position - rootPart.CFrame.LookVector * 5)
+        task.wait(0.4)
         return false
     end
 end
 
 -- =========================================================================
--- ⚡ LUỒNG XỬ LÝ CHÍNH CỦA STAGE 3
+-- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3 (CHẠY BỘ THUẦN TÚY)
 -- =========================================================================
-print("[STAGE 3] Kích hoạt hệ thống chạy theo Waypoint-Tween chống ôm tường...")
+print("[STAGE 3] Bắt đầu luồng chạy bộ 1 mạch tới trạm điện (Không Tween)...")
+local reached = false
 
-local char = localPlayer.Character
-local root = char and char:FindFirstChild("HumanoidRootPart")
-local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-
-if root and humanoid then
-    -- Đảm bảo WalkSpeed dự phòng luôn được gán bằng RUN_SPEED
-    if humanoid.WalkSpeed ~= RUN_SPEED then 
-        humanoid.WalkSpeed = RUN_SPEED 
-    end
+while not reached do
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
     
-    -- Tắt trạng thái tự động nhảy ngầm của Humanoid để không bị rồ dại nhảy tại chỗ
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
-    
-    local targetBox = getNearestPowerBox(root.Position)
-    
-    if targetBox then
-        -- Vòng lặp bám đuổi cho tới khi đứng sát cạnh trạm điện
-        while (root.Position - targetBox.Position).Magnitude > 4.5 do
-            moveSmoothAlongPath(root, targetBox)
-            task.wait(0.1)
+    if root and humanoid then
+        humanoid.WalkSpeed = RUN_SPEED
+        local targetBox = getNearestPowerBox(root.Position)
+        
+        if targetBox then
+            local distance = (root.Position - targetBox.Position).Magnitude
+            
+            -- Nếu cách xa mục tiêu trạm điện, tiến hành chạy bộ dò đường vật lý
+            if distance > 4.5 then
+                walkPathToTarget(root, humanoid, targetBox)
+            else
+                print("[🎯 STAGE 3 SUCCESS] Đã đi bộ tiếp cận sát cạnh trạm điện thành công!");
+                reached = true
+            end
+        else
+            -- Đợi trạm điện xuất hiện nếu game tải chậm
+            task.wait(0.4)
         end
-        
-        print("[🎯 STAGE 3 SUCCESS] Đã tiếp cận trạm điện an toàn mà không dính tường!");
-        
-        -- Bật lại trạng thái nhảy bình thường trả lại cho nhân vật trước khi sang stage sau
-        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-        task.wait(0.2)
-        return true
-    else
-        warn("[❌ STAGE 3 ERROR] Không tìm thấy trạm điện Power Box nào trên bản đồ!")
-        task.wait(1)
-        return false
     end
-else
-    task.wait(0.5)
-    return false
+    task.wait(0.05)
 end
+
+task.wait(0.2)
+
+-- 🔥 CHUYỂN GIAO SANG STAGE 4
+_G.CurrentStage = 4
+return true
