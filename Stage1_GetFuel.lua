@@ -1,41 +1,5 @@
-local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
-local PathfindingService = game:GetService("PathfindingService")
-local RunService = game:GetService("RunService")
-local localPlayer = game:GetService("Players").LocalPlayer
-local TWEEN_SPEED = 30
-
--- Khởi tạo Pathfinding cấu hình chuẩn Roblox (Thu nhỏ bán kính để len lỏi ngách nhỏ tốt hơn)
-local path = PathfindingService:CreatePath({
-    AgentRadius = 1.6, 
-    AgentHeight = 5, 
-    AgentCanJump = true
-})
-local ignoredFuels = {}
-
 -- =========================================================================
--- 🔥 HÀM ĐỊNH VỊ FUEL CHÍNH XÁC VÀ AN TOÀN
--- =========================================================================
-local function getNearestFuel(rootPosition)
-    local nearestFuel = nil
-    local minDistance = math.huge
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj.Name == "Fuel" and (obj:IsA("Model") or obj:IsA("BasePart")) and not ignoredFuels[obj] then
-            local part = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-            if part then
-                local dist = (rootPosition - part.Position).Magnitude
-                if dist < minDistance then
-                    minDistance = dist
-                    nearestFuel = part
-                end
-            end
-        end
-    end
-    return nearestFuel
-end
-
--- =========================================================================
--- 🔥 HÀM TWEEN DÒ ĐƯỜNG KỸ LƯỠNG - CHỐNG KẸT GÓC KHUẤT TUYỆT ĐỐI
+-- 🔥 HÀM TWEEN DÒ ĐƯỜNG THỜI GIAN THỰC - TỰ ĐỘNG BẺ LÁI NÉ TƯỜNG (TỐC ĐỘ 30)
 -- =========================================================================
 local function walkPathToTarget(rootPart, targetPart)
     if not rootPart or not targetPart or not targetPart.Parent then return false end
@@ -48,14 +12,22 @@ local function walkPathToTarget(rootPart, targetPart)
         local waypoints = path:GetWaypoints()
         local totalWaypoints = #waypoints
         
-        for i, waypoint in ipairs(waypoints) do
+        -- Khởi tạo thông số Raycast nâng cao để phát hiện vật cản phía trước
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        raycastParams.FilterDescendantsInstances = {rootPart.Parent, targetPart, targetPart.Parent}
+        raycastParams.IgnoreWater = true
+
+        local i = 1
+        while i <= totalWaypoints do
             if not rootPart.Parent or not targetPart.Parent then return false end
+            local waypoint = waypoints[i]
             
-            -- Tính toán tọa độ lướt mượt (cao hơn mặt sàn 1.8 stud chống ma sát lún chân)
-            local expectedCFrame = CFrame.new(waypoint.Position.X, waypoint.Position.Y + 1.8, waypoint.Position.Z)
+            -- Tối ưu độ cao lướt: Giảm xuống 1.2 stud giúp nhân vật không bị vướng phần đầu vào trần nhà/cửa sổ
+            local expectedCFrame = CFrame.new(waypoint.Position.X, waypoint.Position.Y + 1.2, waypoint.Position.Z)
             local distance = (rootPart.Position - waypoint.Position).Magnitude
             
-            -- Khởi tạo Tween cho chặng nút hiện tại
+            -- BẮT ĐẦU TWEEN CHẶNG NÚT
             local tween = TweenService:Create(rootPart, TweenInfo.new(distance / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = expectedCFrame})
             tween:Play()
             
@@ -66,16 +38,16 @@ local function walkPathToTarget(rootPart, targetPart)
                 if connection then connection:Disconnect() end
             end)
             
-            -- Cảm biến theo dõi chống kẹt thời gian thực
             local lastPosition = rootPart.Position
             local checkTimer = os.clock()
             local loopTimeout = os.clock()
+            local needRecalculate = false -- Biến đánh dấu cần tính toán lại bản đồ
             
             while not tweenCompleted do
                 local currentDist = (rootPart.Position - waypoint.Position).Magnitude
                 
-                -- Cơ chế gối đầu thông minh: Gần tới nút là chuyển tiếp ngay để không bị khựng chân
-                if i < totalWaypoints and currentDist < 3.5 then
+                -- Cơ chế cuốn chiếu (gối đầu mượt): Gần tới nút là chuyển tiếp ngay không khựng chân
+                if i < totalWaypoints and currentDist < 3.2 then
                     tween:Cancel()
                     if connection then connection:Disconnect() end
                     break
@@ -83,90 +55,64 @@ local function walkPathToTarget(rootPart, targetPart)
                     break
                 end
                 
-                -- CỨ MỖI 0.15 GIÂY -> Kiểm tra xem có bị kẹt vào tường/cửa không
-                if (os.clock() - checkTimer) > 0.15 then
+                -- 🕵️ CẢM BIẾN KIỂM TRA VA CHẠM VÀ KẸT TƯỜNG (0.12 giây một lần)
+                if (os.clock() - checkTimer) > 0.12 then
                     local movedDistance = (rootPart.Position - lastPosition).Magnitude
+                    local moveDirection = (waypoint.Position - rootPart.Position).Unit
                     
-                    if movedDistance < 0.8 then -- Di chuyển quá ít chứng tỏ bị cạ tường kẹt góc
-                        tween:Cancel() -- Hủy lệnh lướt cũ đang bị kẹt
+                    -- Cách 1: Bắn tia quét tầm ngắn xem mặt có đang đập vào tường không
+                    local wallCheck = Workspace:Raycast(rootPart.Position, moveDirection * 2.5, raycastParams)
+                    
+                    -- Cách 2: Hoặc dựa vào khoảng cách di chuyển thực tế quá thấp (bị cạ tường đứng yên)
+                    if (wallCheck and wallCheck.Instance and wallCheck.Instance.CanCollide) or (movedDistance < 0.6) then
+                        tween:Cancel()
                         if connection then connection:Disconnect() end
                         
-                        -- KÍCH HOẠT HỆ THỐNG THOÁT KẸT: Nhếch CFrame lên cao và bọc sang hướng điểm nút
-                        local lookDirection = (waypoint.Position - rootPart.Position).Unit
-                        rootPart.CFrame = rootPart.CFrame + Vector3.new(lookDirection.X * 1.5, 3.2, lookDirection.Z * 1.5)
-                        task.wait(0.05)
-                        break -- Thoát vòng lặp chặng này để ép tính toán lộ trình bọc lót
+                        -- Nhếch nhẹ nhẹ CFrame để thoát khỏi điểm ma sát của vách
+                        rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 1.5, 0)
+                        needRecalculate = true -- Kích hoạt trạng thái tìm đường mới
+                        break
                     end
                     
                     checkTimer = os.clock()
                     lastPosition = rootPart.Position
                 end
                 
-                -- Khóa bảo vệ chống treo luồng (Quá 5 giây cho 1 waypoint là tự hủy chặng)
-                if (os.clock() - loopTimeout) > 5 then
+                -- Khóa bảo vệ chống treo chặng
+                if (os.clock() - loopTimeout) > 4 then
                     tween:Cancel()
                     if connection then connection:Disconnect() end
+                    needRecalculate = true
                     break 
                 end
                 
-                RunService.Heartbeat:Wait() -- Chờ theo tần số khung hình máy tính thay vì task.wait lề mề
+                RunService.Heartbeat:Wait()
+            end
+            
+            -- 🔀 ĐỘT PHÁ TỰ ĐỘNG DÒ LẠI ĐƯỜNG:
+            -- Nếu phát hiện bị cản, lập tức vẽ lại một map đường đi mới ngay từ vị trí hiện tại
+            if needRecalculate then
+                task.wait(0.05) -- Nghỉ cực ngắn để tránh spam bộ nhớ
+                local reSuccess = pcall(function()
+                    path:ComputeAsync(rootPart.Position, targetPart.Position)
+                end)
+                if reSuccess and path.Status == Enum.PathStatus.Success then
+                    waypoints = path:GetWaypoints()
+                    totalWaypoints = #waypoints
+                    i = 1 -- Reset vòng lặp về nút đầu tiên của lộ trình mới né tường
+                else
+                    return false -- Nếu không tìm được đường mới thì đổi mục tiêu
+                end
+            else
+                i = i + 1 -- Đường thông thoáng thì đi tiếp nút tiếp theo
             end
         end
         return true
     else
-        -- Nếu bản đồ thay đổi đột ngột làm Pathfinding thất bại, nhếch ngẫu nhiên tìm góc quét mới
-        local nhichPos = rootPart.Position + Vector3.new(math.random(-4, 4), 1.5, math.random(-4, 4))
+        -- Nhếch ngẫu nhiên tìm góc quét mới nếu lỗi map ban đầu
+        local nhichPos = rootPart.Position + Vector3.new(math.random(-3, 3), 1.2, math.random(-3, 3))
         rootPart.CFrame = CFrame.new(nhichPos)
-        task.wait(0.2)
+        task.wait(0.15)
         return false
     end
 end
-
--- =========================================================================
--- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 1
--- =========================================================================
-print("[STAGE 1] Bắt đầu quét tìm nhặt 2 bình Fuel (Dò đường kỹ lưỡng)...")
-local cycle = 1
-local stuckCounter = 0
-
-while cycle <= 2 do
-    local char = localPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then task.wait(0.5) continue end
-    
-    local targetFuel = getNearestFuel(root.Position)
-    if targetFuel then
-        -- Nhận diện chính xác Model hoặc Part gốc để đưa vào danh sách bỏ qua khi xong việc
-        local fuelObject = targetFuel.Parent:IsA("Model") and targetFuel.Parent or targetFuel
-        local success = walkPathToTarget(root, targetFuel)
-        
-        if success then
-            print(string.format("[🎉] Đã tiếp cận Fuel %d/2 thành công!", cycle))
-            
-            -- Chạm vật lý và kích hoạt ProximityPrompt (nếu có) để đảm bảo game nhận lệnh nhặt đồ
-            local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or targetFuel.Parent:FindFirstChildOfClass("ProximityPrompt")
-            if prompt then fireproximityprompt(prompt) end
-            
-            ignoredFuels[fuelObject] = true
-            cycle = cycle + 1
-            stuckCounter = 0
-            task.wait(0.4)
-        else
-            stuckCounter = stuckCounter + 1
-            if stuckCounter >= 3 then
-                print("[⚠️] Bình xăng này nằm ở góc kẹt không thể giải toán đường đi, bỏ qua để tìm bình khác!")
-                ignoredFuels[fuelObject] = true
-                stuckCounter = 0
-            end
-            task.wait(0.1)
-        end
-    else
-        print("[-] Đang quét tìm kiếm lại tài nguyên Fuel...")
-        ignoredFuels = {}
-        task.wait(0.5)
-    end
-end
-
-print("[STAGE 1] HOÀN THÀNH XUẤT SẮC!")
-_G.CurrentStage = 2
-return true
