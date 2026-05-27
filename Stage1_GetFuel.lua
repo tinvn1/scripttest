@@ -1,7 +1,6 @@
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 local localPlayer = game:GetService("Players").LocalPlayer
 local TWEEN_SPEED = 30
 
@@ -12,9 +11,6 @@ local path = PathfindingService:CreatePath({
 })
 local ignoredFuels = {}
 
--- =========================================================================
--- 🔥 HÀM ĐỊNH VỊ FUEL CHÍNH XÁC VÀ AN TOÀN
--- =========================================================================
 local function getNearestFuel(rootPosition)
     local nearestFuel = nil
     local minDistance = math.huge
@@ -33,26 +29,18 @@ local function getNearestFuel(rootPosition)
     return nearestFuel
 end
 
--- =========================================================================
--- 🔥 HÀM DÒ ĐƯỜNG VÀ DI CHUYỂN TỚI MỤC TIÊU (PATHFINDING + TWEEN)
--- =========================================================================
 local function walkPathToTarget(root, targetPart)
     if not root or not targetPart then return false end
-    
     local success, err = pcall(function()
         path:ComputeAsync(root.Position, targetPart.Position)
     end)
-    
-    if not success or path.Status ~= Enum.PathStatus.Success then
-        return false
-    end
+    if not success or path.Status ~= Enum.PathStatus.Success then return false end
     
     local waypoints = path:GetWaypoints()
     for i = 1, math.min(#waypoints, 4) do
         local wp = waypoints[i]
         local dist = (root.Position - wp.Position).Magnitude
         local duration = dist / TWEEN_SPEED
-        
         local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
         local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(wp.Position + Vector3.new(0, 2, 0))})
         tween:Play()
@@ -62,48 +50,60 @@ local function walkPathToTarget(root, targetPart)
 end
 
 -- =========================================================================
--- 🔄 VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 1
+-- 🔄 LUỒNG CHẠY NGẦM ĐỘC LẬP (LOOP LIÊN TỤC KHÔNG DỪNG)
 -- =========================================================================
-print("[STAGE 1] Bắt đầu quét tìm nhặt 2 bình Fuel (Dò đường kỹ lưỡng)...")
-local cycle = 1
-local stuckCounter = 0
+task.spawn(function()
+    print("[⛽ ASYNC] Luồng tìm kiếm Fuel độc lập đã được thiết lập thành công!");
+    local cycle = 1
+    local stuckCounter = 0
 
-while cycle <= 2 do
-    local char = localPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then task.wait(0.5) continue end
-    
-    local targetFuel = getNearestFuel(root.Position)
-    if targetFuel then
-        local fuelObject = targetFuel.Parent:IsA("Model") and targetFuel.Parent or targetFuel
-        local success = walkPathToTarget(root, targetFuel)
-        
-        if success then
-            print(string.format("[🎉] Đã tiếp cận Fuel %d/2 thành công!", cycle))
-            local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or targetFuel.Parent:FindFirstChildOfClass("ProximityPrompt")
-            if prompt and fireproximityprompt then fireproximityprompt(prompt) end
+    while true do
+        -- CHỈ CHẠY khi hệ thống yêu cầu Stage 1
+        if _G.CurrentStage == 1 then
+            local char = localPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
             
-            ignoredFuels[fuelObject] = true
-            cycle = cycle + 1
-            stuckCounter = 0
-            task.wait(0.4)
-        else
-            stuckCounter = stuckCounter + 1
-            if stuckCounter >= 3 then
-                print("[⚠️] Kẹt góc, bỏ qua tìm bình khác!")
-                ignoredFuels[fuelObject] = true
-                stuckCounter = 0
+            if root and cycle <= 2 then
+                local targetFuel = getNearestFuel(root.Position)
+                if targetFuel then
+                    local fuelObject = targetFuel.Parent:IsA("Model") and targetFuel.Parent or targetFuel
+                    local success = walkPathToTarget(root, targetFuel)
+                    
+                    if success then
+                        print(string.format("[🎉 Fuel Độc Lập] Đã nhặt Fuel %d/2!", cycle))
+                        local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or targetFuel.Parent:FindFirstChildOfClass("ProximityPrompt")
+                        if prompt and fireproximityprompt then fireproximityprompt(prompt) end
+                        
+                        ignoredFuels[fuelObject] = true
+                        cycle = cycle + 1
+                        stuckCounter = 0
+                        task.wait(0.4)
+                    else
+                        stuckCounter = stuckCounter + 1
+                        if stuckCounter >= 3 then
+                            ignoredFuels[fuelObject] = true
+                            stuckCounter = 0
+                        end
+                        task.wait(0.1)
+                    end
+                else
+                    print("[⛽] Không thấy bình xăng, làm sạch danh sách quét lại...")
+                    ignoredFuels = {}
+                    task.wait(1.0)
+                end
+            elseif cycle > 2 then
+                -- Đã gom đủ 2 bình xăng thành công!
+                print("[🎯 Fuel Độc Lập] Gom xong xuôi 2 bình. Bàn giao trạng thái cho Stage 2!");
+                cycle = 1 -- Reset bộ đếm sẵn sàng cho chu kỳ sau (nếu bị lùi stage)
+                ignoredFuels = {}
+                _G.CurrentStage = 2 -- Chuyển trạng thái phát tín hiệu cho file main
+                task.wait(1.0)
             end
-            task.wait(0.1)
+        else
+            -- Nếu đang ở các Stage khác (2, 3, 4, 5), luồng này sẽ ngủ ngầm để tiết kiệm CPU
+            task.wait(0.5)
         end
-    else
-        print("[-] Đang quét tìm kiếm lại tài nguyên Fuel...")
-        ignoredFuels = {}
-        task.wait(0.5)
     end
-end
+end)
 
-print("[STAGE 1] HOÀN THÀNH XUẤT SẮC!")
-task.wait(0.1)
-_G.CurrentStage = 2 -- Đẩy trạng thái sang Stage 2
 return true
