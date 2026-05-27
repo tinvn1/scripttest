@@ -1,82 +1,115 @@
-if not game:IsLoaded() then game.Loaded:Wait() end
+-- Chờ trò chơi tải xong xuôi
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
 
-print("[🚀 STAGE 0] Khởi chạy ZHUB & Đợi script load hoàn toàn...");
+print("[🚀 STAGE 0] Khởi chạy Stage 0 - Tiến trình tự động cấu hình ZHUB...");
 
--- Toàn bộ nội dung cấu hình JSON của bạn
-local jsonConfig = [[{"Flags":{"InstantPrompts":false,"SpeedMode":["Normal"],"EnemyESP":false,"SelectedESPItems":[],"FPSBoost":false,"AutoTeleportDropsTeleportDelay":0,"UsePickupCategories":false,"AutoRepairRange":5,"BringPickupSortOrder":["Nearest First"],"BringAllPickup":false,"AutoTeleportDrops":false,"AutoTeleportDropsTarget":["Shredder"],"ShowDistance":false,"FreePsychicDebugBeams":false,"RemoveFog":false,"FreePsychicHoverVisible":true,"DragSelectedItems":[],"ThirdPerson":false,"DragPriorityItems":["Gas Mask","Emerald"],"SchemEnablePlacement":false,"NoRecoil":false,"AutoEatThreshold":50,"ESPCombat":false,"PriorityPickupOverride":false,"AutoShootHealTeammates":false,"Settings_PanicKey":["None","Toggle",[]],"AimSmoothness":0.15,"MaxTargets":10,"KnownPlayersList":[],"AutoShoot":false,"AntiAFK":false,"Fullbright":false,"AutoDrag":true,"Settings_NexusToggle":["None","Toggle",[]],"HideDayCounter":false,"AutoOpenChest":false,"StreamerMode":false,"FreeAxisRotation":false,"Nexus_AutoCollect":false,"NoSlowdown":false,"HitboxExpander":false,"ESPResources":false,"Nexus_Radius":18,"AutoShootAimPart":["Head"],"NoSlowOnBandage":false,"DragPriorityOverride":false,"DragUseCategories":false,"AutoReload":false,"AutoShootTargetMethod":["Distance"],"PreventBasePickup":false,"AutoShootBulletTrails":false,"PanicOnStaff":false,"AutoRepair":false,"AutoLeaveStaff":false,"Settings_MenuToggle":["K","Toggle",[]],"FlySpeed":50,"PickupCategories":[],"PriorityPickupItems":["Gas Mask","Emerald"],"BarrelESP":false,"AutoDragHoldHeight":1,"AutoShootFOV":150,"HitboxSize":10,"SpeedEnabled":false,"DetectUnknown":false,"SchemEnableSelection":false,"ChestsESP":false,"SelectedPickupItems":[],"PanicOnUnknown":false,"AimLocker":false,"Settings_AutoDragToggle":["None","Toggle",[]],"FreePsychicEditorTool":false,"AutoRepairCooldown":0.4,"DragSelectivePickup":false,"AttackSpeedOffset":0,"LockFloatingIcon":false,"MinimapEnabled":false,"AutoDragOrbitAngle":0,"AutoShootRange":100,"ShowLogo":true,"ItemESPFilter":false,"AimPart":["Head"],"Settings_AutoShootToggle":["None","Toggle",[]],"DetectStaff":false,"ConsumeFood":false,"AutoShootUseFOV":false,"AutoEat":false,"FreePsychicPerWeaponTarget":false,"AutoHealThreshold":50,"AutoHeal":false,"SpeedValue":16,"Nexus_Mode":["Radius"],"AutoDragRange":12,"StoreMedicalInBag":false,"TargetingPriorityEnabled":false,"UnlockRotation":false,"AutoRearmTrapRange":10,"NoSpread":false,"DetectionRadius":500,"ShowFPS":false,"BringPickupWhitelist":[],"Nexus_FOV":150,"RapidFireMultiplier":2,"AutoLeaveUnknown":false,"AutoOpenChestRange":25,"BringPickupItem":false,"InfiniteJump":false,"FlyMode":false,"AutoRearmBearTrap":false,"Settings_ZPsychicToggle":["None","Toggle",[]],"FreePsychic":false,"SelectivePickup":false,"Killaura":true,"StoreAmmoInBag":false,"Settings_KillauraToggle":["None","Toggle",[]],"DetectAnticheatFlag":false,"PriorityTargets":[],"ThirdPersonDistance":15,"AutoDeconstruct":false,"AutoDeconstructThreshold":90,"PlaceAnywhere":false,"KillauraRange":35,"DragCategories":[],"AutoDragHoldDistance":3,"ESPMedical":false,"FOV":70,"ESPFuel":false,"RapidFire":false,"AutoDragOrbitSpeed":0,"NoClip":false,"UsePlacementHooks":true,"ESPFood":false},"Version":"5.5.2","GameId":"sta","ConfigVersion":1,"Script":"ZHUB","ExportedAt":1779877178}]]
-
--- 1. Tạo file cấu hình chính xác vào hệ thống thư mục LinoriaLib của Z HUB
-pcall(function()
-    if makefolder then 
-        makefolder("ZHUB")
-        makefolder("ZHUB/configs")
-    end
-    if writefile then
-        -- Lưu thành tên "autoload.json" để tí nữa gọi trực tiếp cho chuẩn
-        writefile("ZHUB/configs/autoload.json", jsonConfig)
-        print("[💾 WORKSPACE] Đã lưu file cấu hình ảo thành công!");
-    end
-end)
-
--- 2. Tải mã nguồn Z HUB từ tác giả
+-- 1. Khởi chạy Menu ZHUB từ link Github của tác giả
 local successLoad, errLoad = pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
 end)
 
-if not successLoad then 
-    return warn("[⚠️ STAGE 0] Không thể tải ZHUB: " .. tostring(errLoad)) 
+if not successLoad then
+    warn("[⚠️ STAGE 0] Không thể tải ZHUB từ Github: " .. tostring(errLoad))
 end
 
--- 3. Tiến trình đợi Script khởi tạo xong UI rồi mới Load Config
+-- 2. Đợi giao diện Menu xuất hiện trong CoreGui hoặc PlayerGui
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local targetGui = nil
+
+-- Vòng lặp tìm kiếm UI của ZHUB
+for i = 1, 30 do
+    targetGui = game:GetService("CoreGui"):FindFirstChild("ZHUB") 
+                or player.PlayerGui:FindFirstChild("ZHUB") 
+                or game:GetService("CoreGui"):FindFirstChildOfClass("ScreenGui")
+    if targetGui and targetGui:FindFirstChildOfClass("Frame") then break end
+    task.wait(0.5)
+end
+
+-- 3. Tự động tìm cấu hình và kích hoạt "Auto Drag Body" & "Kill Aura"
 task.spawn(function()
-    print("[⏳] Đang đợi hệ thống UI của Z HUB load hoàn toàn...")
+    task.wait(3.5) -- Chờ UI khởi tạo hoàn chỉnh các hàng nút và nạp dữ liệu Flags
     
-    -- Vòng lặp chờ LinoriaLib đăng ký SaveManager vào môi trường toàn cục
-    local timeout = 0
-    while not getgenv().SaveManager and timeout < 60 do
-        task.wait(0.5)
-        timeout = timeout + 1
-    end
-
-    if not getgenv().SaveManager then
-        return warn("[⚠️] Quá thời gian chờ! Không tìm thấy SaveManager của bộ UI.")
-    end
-
-    -- Đợi thêm 3 giây để đảm bảo menu đã vẽ xong toàn bộ Toggles/Sliders lên màn hình Mobile
-    task.wait(3)
-
-    print("[🔍] Phát hiện script đã load xong. Tiến hành nạp Config...")
-
-    -- 4. Ép SaveManager của Z HUB tự load file config có tên "autoload"
-    local successConfig, errConfig = pcall(function()
-        local SaveManager = getgenv().SaveManager
-        if SaveManager and SaveManager.Load then
-            SaveManager:Load("autoload")
-            print("[🎉 SUCCESS] Đã gọi lệnh hệ thống nạp thành công cấu hình 'autoload'!")
-        else
-            error("SaveManager không hỗ trợ hàm Load")
-        end
-    end)
-
-    -- Dự phòng: Nếu hàm Load tự động của UI bị lỗi, ép trực tiếp bằng mã lệnh cứng
-    if not successConfig then
-        warn("[⚠️] Không thể load bằng SaveManager ("..tostring(errConfig).."). Đang chuyển sang ép lệnh trực tiếp...")
-        task.wait(1)
+    ---------------------------------------------------------
+    -- CÁCH 1: Kích hoạt thông qua hệ thống Flags cấu hình (Tối ưu nhất)
+    ---------------------------------------------------------
+    if getgenv().Flags then
+        print("[🔍] Phát hiện hệ thống Flags. Đang ghi đè trạng thái kích hoạt...")
         
-        local function forceSet(flag, val)
-            if getgenv().Toggles and getgenv().Toggles[flag] then pcall(function() getgenv().Toggles[flag]:SetValue(val) end) end
-            if getgenv().Options and getgenv().Options[flag] then pcall(function() getgenv().Options[flag]:SetValue(val) end) end
+        -- Kích hoạt Auto Drag Body (Đúng tên Flag của ZHUB)
+        if getgenv().Flags["Auto Drag Body"] ~= nil then
+            getgenv().Flags["Auto Drag Body"]:Set(true)
+            print("[🎯 FLAGS] Đã bật: Auto Drag Body")
+        elseif getgenv().Flags["Auto Drag"] ~= nil then
+            getgenv().Flags["Auto Drag"]:Set(true)
+            print("[🎯 FLAGS] Đã bật: Auto Drag")
         end
         
-        forceSet("Killaura", true)
-        forceSet("KillauraRange", 35)
-        forceSet("AutoDrag", true)
-        forceSet("AutoDragRange", 12)
-        forceSet("AutoDragHoldDistance", 3)
-        forceSet("AutoDragHoldHeight", 1)
-        
-        print("[🎉 SUCCESS] Đã hoàn thành nạp ép buộc bằng cấu trúc Toggles/Options.")
+        -- Kích hoạt Kill Aura
+        if getgenv().Flags["Kill Aura"] ~= nil then
+            getgenv().Flags["Kill Aura"]:Set(true)
+            print("[🎯 FLAGS] Đã bật: Kill Aura")
+        elseif getgenv().Flags["KillAura"] ~= nil then
+            getgenv().Flags["KillAura"]:Set(true)
+            print("[🎯 FLAGS] Đã bật: KillAura")
+        end
     end
+    
+    ---------------------------------------------------------
+    -- CÁCH 2: Phương án dự phòng (Quét chuyển Tab và giả lập Click vào nút Toggle)
+    ---------------------------------------------------------
+    task.wait(0.5)
+    if targetGui then
+        -- Hàm hỗ trợ click chuyển Tab/Nút phụ trợ
+        local function secureClick(btn)
+            if not btn then return end
+            if getconnections then
+                for _, connection in pairs(getconnections(btn.MouseButton1Click)) do connection:Fire() end
+                for _, connection in pairs(getconnections(btn.MouseButton1Down)) do connection:Fire() end
+            end
+            btn.MouseButton1Click:Fire()
+        end
+
+        -- Quét chuyển Tab Combat để hỗ trợ kích hoạt trực quan trên UI nếu Cách 1 hụt
+        for _, tab in pairs(targetGui:GetDescendants()) do
+            if tab:IsA("TextButton") and (tab.Text == "Combat" or tab.Text == "Main") then
+                secureClick(tab)
+                task.wait(0.2)
+            end
+        end
+
+        -- Quét sâu cấu trúc nút Toggle vật lý
+        for _, v in pairs(targetGui:GetDescendants()) do
+            if v:IsA("TextLabel") then
+                local text = string.lower(v.Text)
+                -- Kiểm tra chính xác từ khóa theo UI thực tế
+                if string.find(text, "kill aura") or string.find(text, "drag body") or string.find(text, "auto drag") then
+                    local p = v.Parent
+                    if p then
+                        -- Tìm nút gạt (Toggle) tương tác trực tiếp
+                        local toggleBtn = p:FindFirstChildOfClass("TextButton") 
+                                       or p:FindFirstChildOfClass("ImageButton") 
+                                       or p.Parent:FindFirstChildOfClass("TextButton")
+                        
+                        if toggleBtn then
+                            local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
+                            for _, event in ipairs(events) do
+                                if toggleBtn[event] then
+                                    for _, connection in pairs(getconnections(toggleBtn[event])) do
+                                        connection:Fire()
+                                    end
+                                end
+                            end
+                            print("[🎯 UI CLICK] Đã gửi lệnh click dự phòng cho nút: " .. v.Text)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    print("[🎉 SUCCESS] Hoàn tất luồng xử lý kích hoạt Stage 0!")
 end)
 
 return true
