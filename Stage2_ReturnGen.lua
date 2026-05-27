@@ -37,6 +37,7 @@ local function tweenToGenerator(rootPart, genPart)
         end
         return true
     else
+        -- Nếu Pathfinding lỗi thì Teleport thẳng tới máy phát điện để chữa cháy
         rootPart.CFrame = CFrame.new(genPart.Position + Vector3.new(0, 2, 0))
         return true
     end
@@ -45,25 +46,34 @@ end
 -- =========================================================================
 -- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 2
 -- =========================================================================
-print("[STAGE 2] Tiến về máy phát điện để nạp Fuel...")
+print("[STAGE 2] Đang tìm kiếm và tiến về phía máy phát điện...");
 
 local char = localPlayer.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
 
 if root then
     local genPart = getGenerator()
+    
     if genPart then
-        -- 1. Di chuyển lướt Tween mượt mà đến sát cạnh máy phát điện
+        -- 1. Tính khoảng cách và di chuyển đến máy phát điện
         local distance = (root.Position - genPart.Position).Magnitude
         if distance > 4 then
+            print("[STAGE 2] Đang di chuyển tới máy phát điện...")
             tweenToGenerator(root, genPart)
         end
         
-        -- Nếu không tìm thấy máy, quay lại Stage 1 quét tài nguyên tránh treo acc
-        print("[⚠️] Không tìm thấy máy phát điện, trả luồng về Stage 1...")
+        -- 2. Đã đến nơi thành công -> Chuyển thẳng sang Stage 3
+        print("[🎯 STAGE 2 SUCCESS] Đã đến vị trí máy phát điện. Chuyển sang STAGE 3!")
+        task.wait(0.3) -- Delay nhỏ để nhân vật đứng vững ổn định vị trí
+        _G.CurrentStage = 3
+        return true
+    else
+        -- Trường hợp KHÔNG tìm thấy máy phát điện trên map
+        warn("[⚠️ STAGE 2 ERROR] Không tìm thấy máy phát điện trên Map! Quay lại Stage 1...")
         _G.CurrentStage = 1
         return false
     end
+else
+    warn("[⚠️ STAGE 2 ERROR] Không tìm thấy HumanoidRootPart của nhân vật!")
+    return false
 end
-
-task.wait(0.2)
