@@ -4,7 +4,7 @@ local TweenService = game:GetService("TweenService")
 local localPlayer = game:GetService("Players").LocalPlayer
 
 local RUN_SPEED = 30 
-local TWEEN_SPEED = 35 -- Tốc độ bay cứu viện khi bị kẹt nhảy
+local TWEEN_SPEED = 30 -- Tốc độ bay cứu viện khi bị kẹt nhảy
 
 -- Khởi tạo Pathfinding cấu hình chuẩn
 local path = PathfindingService:CreatePath({
