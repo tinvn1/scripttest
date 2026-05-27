@@ -50,60 +50,54 @@ local function walkPathToTarget(root, targetPart)
 end
 
 -- =========================================================================
--- 🔄 LUỒNG CHẠY NGẦM ĐỘC LẬP (LOOP LIÊN TỤC KHÔNG DỪNG)
+-- ⚡ TIẾN TRÌNH NHẶT XĂNG KHÓA LUỒNG
 -- =========================================================================
-task.spawn(function()
-    print("[⛽ ASYNC] Luồng tìm kiếm Fuel độc lập đã được thiết lập thành công!");
-    local cycle = 1
-    local stuckCounter = 0
+print("[⛽ STAGE 1] Bắt đầu quét tìm nhặt đúng 2 bình Fuel...");
+local cycle = 1
+local stuckCounter = 0
 
-    while true do
-        -- CHỈ CHẠY khi hệ thống yêu cầu Stage 1
-        if _G.CurrentStage == 1 then
-            local char = localPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if root and cycle <= 2 then
-                local targetFuel = getNearestFuel(root.Position)
-                if targetFuel then
-                    local fuelObject = targetFuel.Parent:IsA("Model") and targetFuel.Parent or targetFuel
-                    local success = walkPathToTarget(root, targetFuel)
-                    
-                    if success then
-                        print(string.format("[🎉 Fuel Độc Lập] Đã nhặt Fuel %d/2!", cycle))
-                        local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or targetFuel.Parent:FindFirstChildOfClass("ProximityPrompt")
-                        if prompt and fireproximityprompt then fireproximityprompt(prompt) end
-                        
-                        ignoredFuels[fuelObject] = true
-                        cycle = cycle + 1
-                        stuckCounter = 0
-                        task.wait(0.4)
-                    else
-                        stuckCounter = stuckCounter + 1
-                        if stuckCounter >= 3 then
-                            ignoredFuels[fuelObject] = true
-                            stuckCounter = 0
-                        end
-                        task.wait(0.1)
-                    end
-                else
-                    print("[⛽] Không thấy bình xăng, làm sạch danh sách quét lại...")
-                    ignoredFuels = {}
-                    task.wait(1.0)
-                end
-            elseif cycle > 2 then
-                -- Đã gom đủ 2 bình xăng thành công!
-                print("[🎯 Fuel Độc Lập] Gom xong xuôi 2 bình. Bàn giao trạng thái cho Stage 2!");
-                cycle = 1 -- Reset bộ đếm sẵn sàng cho chu kỳ sau (nếu bị lùi stage)
-                ignoredFuels = {}
-                _G.CurrentStage = 2 -- Chuyển trạng thái phát tín hiệu cho file main
-                task.wait(1.0)
-            end
-        else
-            -- Nếu đang ở các Stage khác (2, 3, 4, 5), luồng này sẽ ngủ ngầm để tiết kiệm CPU
-            task.wait(0.5)
-        end
+-- Vòng lặp này giữ chân Script, GIỮ KHÔNG CHO MAIN CHẠY SANG STAGE 2
+while cycle <= 2 do
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if not root then 
+        task.wait(0.5) 
+        continue 
     end
-end)
+    
+    local targetFuel = getNearestFuel(root.Position)
+    if targetFuel then
+        local fuelObject = targetFuel.Parent:IsA("Model") and targetFuel.Parent or targetFuel
+        local success = walkPathToTarget(root, targetFuel)
+        
+        if success then
+            print(string.format("[🎉 STAGE 1] Đã tiếp cận và nhặt bình Fuel %d/2 thành công!", cycle))
+            local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or targetFuel.Parent:FindFirstChildOfClass("ProximityPrompt")
+            if prompt and fireproximityprompt then 
+                fireproximityprompt(prompt) 
+            end
+            
+            ignoredFuels[fuelObject] = true
+            cycle = cycle + 1
+            stuckCounter = 0
+            task.wait(0.5) -- Đợi server nhận item
+        else
+            stuckCounter = stuckCounter + 1
+            if stuckCounter >= 3 then
+                print("[⚠️ STAGE 1] Bình này bị kẹt góc, bỏ qua tìm bình khác!")
+                ignoredFuels[fuelObject] = true
+                stuckCounter = 0
+            end
+            task.wait(0.2)
+        end
+    else
+        print("[⛽ STAGE 1] Không tìm thấy bình xăng nào trống, đang quét lại map...")
+        ignoredFuels = {}
+        task.wait(1.0)
+    end
+end
 
+-- CHỈ KHI CHẠY XUỐNG ĐÂY (ĐỦ 2 BÌNH) -> MỚI BÁO CÁO HOÀN THÀNH
+print("[🎯 STAGE 1] Đã thu thập đủ 2 bình xăng! Giải phóng luồng...");
 return true
