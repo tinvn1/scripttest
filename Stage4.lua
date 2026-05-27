@@ -1,7 +1,6 @@
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local localPlayer = game:GetService("Players").LocalPlayer
-local camera = workspace.CurrentCamera
 
 -- =========================================================================
 -- 🔥 HÀM DÒ TÌM CHÍNH XÁC NÚT BẤM (PROXIMITYPROMPT) CỦA POWER PLANT
@@ -11,7 +10,7 @@ local function getPowerBoxPrompt()
         if obj:IsA("ProximityPrompt") then
             if obj.Parent and obj.Parent.Name == "Power Box" then
                 return obj
-            elseif string.find(string.lower(obj.ObjectText), "power plant") or string.find(string.lower(obj.ActionText), "repair") then
+            elseif string.find(string.lower(obj.ObjectText or ""), "power plant") or string.find(string.lower(obj.ActionText or ""), "repair") then
                 return obj
             end
         end
@@ -19,27 +18,12 @@ local function getPowerBoxPrompt()
     return nil
 end
 
--- =========================================================================
--- ĐIỀU CHỈNH CAMERA NGANG ĐỂ KHÔNG BỊ LỖI GÓC NHÌN TỪ TRÊN XUỐNG
--- =========================================================================
-local function fixCameraForPrompt(promptTarget)
-    if promptTarget and promptTarget.Parent and promptTarget.Parent:IsA("BasePart") then
-        camera.CameraType = Enum.CameraType.Scriptable
-        local targetPos = promptTarget.Parent.Position
-        camera.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 7), targetPos)
-        task.wait(0.05) -- Thời gian chờ tối thiểu để game render nút
-        camera.CameraType = Enum.CameraType.Custom
-    end
-end
-
-print("[🛠️ STAGE 4] Kích hoạt sửa máy Power Plant (Luồng Cô Lập)...")
+print("[🛠️ STAGE 4] Kích hoạt tự động sửa máy khi lại gần (An Toàn)...")
 
 local repairStarted = false
-local startTime = os.clock() -- Tính toán chính xác mili-giây
-local holdConnection = nil
-
--- Khởi tạo liên kết quét cục bộ (Local Connection) để tự hủy hoàn toàn khi xong việc
+local startTime = 0
 local stage4Connection
+
 stage4Connection = RunService.Heartbeat:Connect(function()
     local char = localPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -47,40 +31,49 @@ stage4Connection = RunService.Heartbeat:Connect(function()
     if root then
         local prompt = getPowerBoxPrompt()
         
-        if prompt then
-            -- Bypass kiểm tra góc nhìn từ trên xuống của game lên ProximityPrompt
-            if prompt.RequiresLineOfSight then prompt.RequiresLineOfSight = false end
-            if prompt.MaxActivationDistance < 15 then prompt.MaxActivationDistance = 25 end
-
-            if not repairStarted then
-                print("[🖱️] Đã tìm thấy nút tương tác!")
-                fixCameraForPrompt(prompt)
+        if prompt and prompt.Parent and prompt.Parent:IsA("BasePart") then
+            -- Tính khoảng cách giữa nhân vật và hộp điện
+            local distance = (root.Position - prompt.Parent.Position).Magnitude
+            
+            -- Chỉ kích hoạt khi khoảng cách lại gần (dưới 15 studs hoặc tùy bạn chỉnh)
+            if distance <= 15 then
                 
-                print("[⏳] Tiến hành ép giữ nút sửa máy liên tục...")
-                repairStarted = true
-                startTime = os.clock()
+                -- Cấu hình bypass các giới hạn cơ bản của game một lần duy nhất
+                if prompt.RequiresLineOfSight then prompt.RequiresLineOfSight = false end
                 
-                -- Luồng ép giữ nút chạy song song tần suất cao
-                holdConnection = task.spawn(function()
-                    while repairStarted and prompt and prompt.Parent do
-                        if prompt.HoldDuration > 0 then
+                if not repairStarted then
+                    print("[🖱️] Đã đến gần Power Box! Tự động kích hoạt sửa máy...")
+                    repairStarted = true
+                    startTime = os.clock()
+                    
+                    -- Kích hoạt giữ nút một cách tự nhiên theo cơ chế của Roblox Engine
+                    -- Không dùng vòng lặp spam tránh kích hoạt nhầm bảng mua Robux
+                    task.spawn(function()
+                        if fireproximityprompt then
+                            fireproximityprompt(prompt)
+                        else
                             prompt:InputHoldBegin()
                         end
-                        fireproximityprompt(prompt)
-                        task.wait(0.05) -- Nhấn giữ siêu tốc chống tuột phím
-                    end
-                end)
-            end
-            
-            -- ĐÚNG 16 GIÂY (Tính theo os.clock) -> NGẮT KẾT NỐI NGAY TỨC THÌ
-            if repairStarted and (os.clock() - startTime) >= 16 then
-                print("[🎯 STAGE 4 SUCCESS] Đã giữ nút sửa máy hoàn tất thời gian!")
-                stage4Connection:Disconnect()
+                    end)
+                end
+                
+                -- KIỂM TRA THỜI GIAN HOÀN THÀNH (16 giây)
+                if repairStarted and (os.clock() - startTime) >= 16 then
+                    print("[🎯 STAGE 4 SUCCESS] Đã sửa máy đủ thời gian quy định!")
+                    stage4Connection:Disconnect()
+                end
+            else
+                -- Nếu người chơi chạy ra quá xa khi chưa sửa xong thì reset trạng thái để sẵn sàng cho lần lại gần tiếp theo
+                if repairStarted then
+                    print("[⚠️] Quá xa mục tiêu, tạm dừng tiến trình sửa.")
+                    repairStarted = false
+                    pcall(function() prompt:InputHoldEnd() end)
+                end
             end
         else
-            -- Nếu đang sửa mà nút biến mất trước (Do đồng đội sửa xong hoặc game nhận lệnh sớm)
+            -- Nếu nút biến mất (đã sửa xong hoặc biến mất khỏi map)
             if repairStarted then
-                print("[🎯 STAGE 4 SUCCESS] Nút biến mất. Sửa máy thành công!")
+                print("[🎯 STAGE 4 SUCCESS] Nút đã biến mất. Sửa máy thành công!")
                 stage4Connection:Disconnect()
             end
         end
@@ -88,11 +81,10 @@ stage4Connection = RunService.Heartbeat:Connect(function()
 end)
 
 -- Treo luồng script Stage 4 tạm thời cho đến khi Connection phía trên tự hủy hoàn toàn
-while stage4Connection.Connected do task.wait() end
+while stage4Connection and stage4Connection.Connected do task.wait() end
 
 -- DỌN DẸP SẠCH SẼ BỘ NHỚ LẬP TỨC
 repairStarted = false
-if holdConnection then task.cancel(holdConnection) end
 local finalPrompt = getPowerBoxPrompt()
 if finalPrompt then pcall(function() finalPrompt:InputHoldEnd() end) end
 
