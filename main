@@ -1,108 +1,34 @@
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-
-local startTimeGlobal = os.clock()
-local isForcedRejoining = false
-_G.CurrentStage = 1 -- Initialize the state machine
-
-print("[⚡ SYSTEM] Khởi động Main Loader - Đã tách biệt Stage 0 chạy loadstring từ xa!");
-local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
-
 -- =========================================================================
--- ⏱️ LUỒNG ÉP REJOIN KHẨN CẤP ĐÚNG 2 PHÚT
--- =========================================================================
-task.spawn(function()
-    local TeleportService = game:GetService("TeleportService")
-    local Players = game:GetService("Players")
-    local localPlayer = Players.LocalPlayer
-
-    while not isForcedRejoining do
-        local elapsed = os.clock() - startTimeGlobal
-        
-        if elapsed >= 120 then
-            isForcedRejoining = true
-            print("[⚠️ TIMEOUT] Đã chạm mốc 2 phút khẩn cấp! Đang ép Rejoin...");
-            
-            local PlayerGui = localPlayer:WaitForChild("PlayerGui")
-            for _, obj in pairs(PlayerGui:GetDescendants()) do
-                if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
-                    if obj.Visible and obj.AbsolutePosition.Y > 0 then
-                        if getconnections then
-                            for _, connection in pairs(getconnections(obj.MouseButton1Click)) do connection:Fire() end
-                        end
-                        obj.MouseButton1Click:Fire()
-                        break
-                    end
-                end
-            end
-            
-            local teleportOptions = Instance.new("TeleportOptions")
-            teleportOptions.ServerInstanceId = game.JobId
-            while true do
-                pcall(function()
-                    TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
-                end)
-                task.wait(1)
-            end
-            break
-        end
-        task.wait(0.1)
-    end
-end)
-
--- =========================================================================
--- 🔄 HÀM TẢI VÀ THỰC THI FILE TỪ GITHUB
--- =========================================================================
-local function runFile(fileName)
-    if isForcedRejoining then return false end
-
-    local success, content = pcall(function() 
-        return game:HttpGet(baseUrl .. fileName) 
-    end)
-    
-    if success and content then
-        content = string.gsub(content, "Enum%.PathJointAction", "Enum.PathWaypointAction")
-        content = string.gsub(content, "PathJointAction", "PathWaypointAction")
-        
-        local func, err = loadstring(content)
-        if func then
-            print("[▶️ RUNNING] Cấu phần: " .. fileName)
-            return func() -- Return the result so the state machine can read it
-        else
-            -- Fixed the broken string literal that caused compilation errors
-            warn("Lỗi biên dịch cấu phần: " .. fileName .. " | " .. tostring(err))
-            return false
-        end
-    else
-        warn("Không thể tải file từ GitHub: " .. fileName)
-        return false
-    end
-end
-
--- Khởi động các module độc lập
-task.spawn(function() runFile("Stage0_ZHUB.lua") end)
-task.spawn(function() runFile("AutoEquip.lua") end)
-
--- =========================================================================
--- ⚙️ STATE MACHINE (VÒNG LẶP KIỂM SOÁT LUỒNG CHÍNH)
+-- ⚙️ STATE MACHINE (VÒNG LẶP ĐIỀU KHIỂN CHÍNH LẮNG NGHE BIẾN _G.CurrentStage)
 -- =========================================================================
 task.spawn(function()
     while not isForcedRejoining do
         if _G.CurrentStage == 1 then
-            runFile("Stage1_GetFuel.lua")
+            -- Chạy nhặt xăng
+            runFile("Stage1_GetFuel.lua") 
+            -- Khi Stage 1 nhặt đủ 2 bình xong xuôi, bạn nhớ để dòng `_G.CurrentStage = 2` ở cuối file Stage 1 nhé!
+            
         elseif _G.CurrentStage == 2 then
+            -- Chạy cất xăng + Spy Check máy lên cấp 2
             runFile("Stage2_ReturnGen.lua")
+            -- File Stage 2 ở trên sẽ tự động đổi _G.CurrentStage thành 3 (nếu thành công) hoặc về 1 (nếu thiếu xăng)
+            
         elseif _G.CurrentStage == 3 then
-            runFile("Stage3_RepairBox.lua")
-            -- Automatically move to stage 4 upon successful repair approach
-            if not isForcedRejoining then _G.CurrentStage = 4 end 
+            -- Di chuyển đến Trạm điện (Power Box)
+            local success3 = runFile("Stage3_RepairBox.lua")
+            if success3 then
+                _G.CurrentStage = 4
+            end
+            
         elseif _G.CurrentStage == 4 then
+            -- Sửa trạm điện (Giữ chặt Prompt)
             runFile("Stage4.lua")
+            
         elseif _G.CurrentStage == 5 then
+            -- Quét UI và Rejoin
             runFile("Stage5.lua")
-            break -- End loop, let Stage 5 handle the rejoin
+            break -- Thoát vòng lặp chính để nhảy Server
         end
-        task.wait(0.5) -- Prevent thread exhaustion
+        task.wait(0.5) -- Nghỉ ngắn chống tràn dung lượng CPU (Spam thread)
     end
 end)
