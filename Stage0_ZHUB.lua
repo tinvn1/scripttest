@@ -1,30 +1,31 @@
--- 1. Tự động thiết lập cấu hình thân thiện Mobile & PC
+-- 1. Tạo thư mục và ghi file cấu hình chuẩn cho ZHUB
+local httpService = game:GetService("HttpService")
+local configName = "ZHUB_Config.json" -- Tên file gốc của bạn
+
 local optimizedConfig = {
     ["Flags"] = {
         ["Killaura"] = true,
-        ["KillauraRange"] = 25, -- Giảm xuống 25 để tránh lỗi Anticheat kích hoạt trên Mobile
+        ["KillauraRange"] = 25,
         ["AutoEat"] = true,
         ["AutoEatThreshold"] = 50,
         ["AutoHeal"] = true,
         ["AutoHealThreshold"] = 50,
-        ["AutoDrag"] = true, -- Tự động hút/gom vật phẩm
+        ["AutoDrag"] = true,
         ["AutoDragRange"] = 15,
         ["DragPriorityItems"] = {"Gas Mask", "Emerald"},
-        ["AntiAFK"] = true, -- Chống bị văng game khi treo máy lâu
-        ["FPSBoost"] = true, -- Bật tối ưu FPS cho máy yếu/Mobile
-        ["RemoveFog"] = true, -- Xóa sương mù giúp nhìn rõ và mượt hơn
-        ["Fullbright"] = true, -- Làm sáng bản đồ
-        ["Settings_MenuToggle"] = {"K", "Toggle", {}}, -- Phím K để ẩn/hiện menu trên PC
-        ["ShowFPS"] = false,
-        ["ShowDistance"] = false,
-        ["ESPCombat"] = false, -- Tắt bớt ESP để không bị lag máy
-        ["ChestsESP"] = false,
-        ["ESPResources"] = false,
+        ["PriorityPickupItems"] = {"Gas Mask", "Emerald"},
+        ["AntiAFK"] = true,
+        ["FPSBoost"] = true,
+        ["RemoveFog"] = true,
+        ["Fullbright"] = true,
+        ["Settings_MenuToggle"] = {"K", "Toggle", {}},
+        ["NoRecoil"] = true,
+        ["NoSpread"] = true,
         ["AutoReload"] = true,
-        ["NoRecoil"] = true, -- Tắt độ giật súng
-        ["NoSpread"] = true, -- Đạn bay thẳng
-        ["SpeedEnabled"] = false, -- Để false cho an toàn, bật lên dễ bị kick
-        ["SpeedValue"] = 16
+        ["SpeedEnabled"] = false,
+        ["SpeedValue"] = 16,
+        ["ESPCombat"] = false,
+        ["ChestsESP"] = false
     },
     ["Version"] = "5.5.2",
     ["GameId"] = "sta",
@@ -32,12 +33,20 @@ local optimizedConfig = {
     ["Script"] = "ZHUB"
 }
 
--- 2. Lưu cấu hình vào bộ nhớ máy (Tùy biến theo từng Executor)
+-- Tiến hành ép ghi file vào tất cả các đường dẫn mà ZHUB có thể quét
 if writefile then
-    -- Lưu thành file config mặc định của ZHUB để script tự nhận diện khi load
-    writefile("ZHUB_Config.json", game:GetService("HttpService"):JSONEncode(optimizedConfig))
-    writefile("ZHUB/sta.json", game:GetService("HttpService"):JSONEncode(optimizedConfig))
+    local jsonData = httpService:JSONEncode(optimizedConfig)
+    
+    -- Cách 1: Ghi thẳng vào file config chung
+    pcall(function() writefile(configName, jsonData) end)
+    
+    -- Cách 2: Tạo thư mục ZHUB (nếu chưa có) và ghi file cấu hình riêng của game
+    if makefolder then
+        pcall(function() makefolder("ZHUB") end)
+        pcall(function() writefile("ZHUB/sta.json", jsonData) end)
+        pcall(function() writefile("ZHUB/config.json", jsonData) end)
+    end
 end
 
--- 3. Khởi chạy Script chính
+-- 2. Khởi chạy Script
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
