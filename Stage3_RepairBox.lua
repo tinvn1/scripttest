@@ -1,15 +1,15 @@
 -- =========================================================================
--- 🛡️ CƠ CHẾ KIỂM TRA ĐIỀU KIỆN ĐẦU FILE (CẤP ĐỘ MÁY PHÁT ĐIỆN)
+-- 🛡️ CƠ CHẾ CHẶN ĐẦU TỰ ĐỘNG KIỂM TRA BIẾN SỐ CẤP ĐỘ MÁY PHÁT ĐIỆN
 -- =========================================================================
-print("[STAGE 3] Đang kiểm tra điều kiện mở map từ Stage 2...")
+print("[STAGE 3] Đang kiểm tra điều kiện mở map...")
 
 if _G.GeneratorLevelUp ~= true then
-    warn("[❌ STAGE 3 BLOCKED] Máy chưa đạt cấp 2 / Chưa mở map! PHẠT: Quay về Stage 1 lập tức.")
+    warn("[❌ STAGE 3 BLOCKED] Máy chưa lên cấp 2 / Map chưa mở hợp lệ! PHẠT: Quay về Stage 1.")
     _G.CurrentStage = 1
-    return false -- Ngắt hoàn toàn file Stage 3 tại đây, không chạy bất cứ logic bên dưới nào
+    return false -- Hủy bỏ toàn bộ luồng chạy của file Stage 3 ngay tại đây, không làm gì thêm
 end
 
-print("[🎯 STAGE 3 ALLOWED] Máy đã lên cấp 2! Mở khóa cho cơ chế hoạt động.")
+print("[🎯 STAGE 3 ALLOWED] Máy đã đạt cấp độ yêu cầu! Bắt đầu tiến trình chạy bộ sửa trạm điện.")
 
 -- =========================================================================
 -- 🏃‍♂️ TOÀN BỘ LOGIC CHẠY BỘ SỬA TRẠM ĐIỆN GỐC CỦA BẠN (GIỮ NGUYÊN)
@@ -46,4 +46,4 @@ local function getNearestPowerBox(rootPosition)
     return nearestBoxPart
 end
 
--- ... (Giữ nguyên phần hàm walkPathToTarget và vòng lặp chính phía dưới của bạn)
+-- ... (Giữ nguyên toàn bộ phần walkPathToTarget và vòng lặp vật lý phía sau của bạn)
