@@ -4,9 +4,6 @@ local TweenService = game:GetService("TweenService")
 local localPlayer = game:GetService("Players").LocalPlayer
 local TWEEN_SPEED = 30
 
--- =========================================================================
--- 🔥 HÀM ĐỊNH VỊ MÁY PHÁT ĐIỆN
--- =========================================================================
 local function getGenerator()
     for _, obj in pairs(Workspace:GetDescendants()) do
         if obj.Name == "Generator" or obj.Name == "Gen" or obj.Name == "MainGen" then
@@ -16,9 +13,6 @@ local function getGenerator()
     return nil
 end
 
--- =========================================================================
--- 🔥 HÀM DI CHUYỂN TWEEN ĐƯA NHIÊN LIỆU VỀ MÁY
--- =========================================================================
 local function tweenToGenerator(rootPart, genPart)
     if not rootPart or not genPart then return false end
     local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true})
@@ -41,34 +35,53 @@ local function tweenToGenerator(rootPart, genPart)
     end
 end
 
--- =========================================================================
--- VÒNG LẶP HÀNH ĐỘNG CHÍNH CỦA STAGE 2
--- =========================================================================
-print("[STAGE 2] Đang di chuyển nạp nhiên liệu về máy phát điện...")
-
+print("[STAGE 2] Đang di chuyển nạp nhiên liệu về máy...")
 local char = localPlayer.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
 
 if root then
     local genPart = getGenerator()
     if genPart then
-        -- 1. Chạy tới máy phát điện
+        -- 1. Tiếp cận máy phát điện
         tweenToGenerator(root, genPart)
-        task.wait(0.2)
+        task.wait(0.1)
         
-        -- 2. Chỉ phụ trách tương tác đút nhiên liệu vào máy để kích hoạt mở map
-        local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
+        -- 2. Kích hoạt cổng Spy 2.5 rình cấu trúc thay đổi nhỏ
+        local genModel = genPart:IsA("Model") and genPart or genPart.Parent
+        local isLevelUp = false
+        
+        local connAdd = genModel.DescendantAdded:Connect(function() isLevelUp = true end)
+        local connRemove = genModel.DescendantRemoving:Connect(function() isLevelUp = true end)
+        
+        -- 3. Thực hiện bấm nút nạp nhiên liệu mở map
+        local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genModel:FindFirstChildOfClass("ProximityPrompt")
         if prompt then
             fireproximityprompt(prompt)
-            print("[⚡ STAGE 2] Đã nạp nhiên liệu thành công! Chuyển giao luồng check cấp cho Spy 2.5.")
         end
         
-        -- 3. Gọi ngay cơ chế Check 2.5 chạy song song kiểm tra xem máy lên cấp mở map chưa
-        _G.ActivateSpy25(genPart)
+        -- 4. Chờ 4.5 giây xem thế giới game có phản hồi biến số nhỏ nào không
+        local startCheck = os.clock()
+        while (os.clock() - startCheck) < 4.5 do
+            if isLevelUp then break end
+            task.wait(0.05)
+        end
+        
+        connAdd:Disconnect()
+        connRemove:Disconnect()
+        
+        -- 5. Trả kết quả về biến toàn cục cho Stage sau check
+        if isLevelUp then
+            print("[🎯 SPY SUCCESS] Xác nhận máy phát điện đã lên cấp 2 thành công!")
+            _G.GeneratorLevelUp = true
+            _G.CurrentStage = 3
+        else
+            warn("[❌ SPY FAILED] Máy im lìm không lên cấp.")
+            _G.GeneratorLevelUp = false
+            _G.CurrentStage = 1
+        end
     else
-        warn("[⚠️ STAGE 2] Không thấy máy phát điện! Hạ về Stage 1.")
+        _G.GeneratorLevelUp = false
         _G.CurrentStage = 1
     end
 end
-
 return true
