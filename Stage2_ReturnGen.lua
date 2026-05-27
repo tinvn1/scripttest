@@ -17,112 +17,87 @@ local function getGenerator()
 end
 
 -- =========================================================================
--- 🔥 HÀM KIỂM TRA MÁY ĐÃ ĐỦ 2 BÌNH XĂNG/FUSE CHƯA
+-- 🔥 HÀM DÙNG DỮ LIỆU SPY ĐỂ CHECK XEM GENERATOR ĐÃ LÊN CẤP 2 CHƯA
 -- =========================================================================
-local function isGeneratorFullyLoaded(genPart)
+local function isGeneratorStage2(genPart)
     if not genPart then return false end
-    local genModel = genPart.Parent
     
-    -- Cách 1: Kiểm tra các giá trị Value lưu trữ số lượng xăng trong máy
-    for _, child in pairs(genModel:GetDescendants()) do
-        if child:IsA("IntValue") or child:IsA("NumberValue") then
-            if string.find(string.lower(child.Name), "fuel") or string.find(string.lower(child.Name), "fuse") or child.Name == "Count" then
-                if child.Value >= 2 then return true end
+    -- Lấy Model gốc của máy phát điện (Thường là Parent của Part chính)
+    local genModel = genPart:IsA("Model") and genPart or genPart.Parent
+    
+    if genModel then
+        -- Đọc dữ liệu thuộc tính ẩn "Stage" mà script Spy đã quét được
+        local currentStage = genModel:GetAttribute("Stage")
+        
+        if currentStage then
+            print("[🕵️ SYSTEM CHECK] Thuộc tính Stage hiện tại của Generator là: " .. tostring(currentStage))
+            -- Nếu giá trị thuộc tính Stage từ 2 trở lên -> Máy đã lên cấp 2 thành công
+            if tonumber(currentStage) >= 2 then
+                return true
             end
         end
     end
-    
-    -- Cách 2: Đếm số lượng vật thể xăng vật lý được cắm vào mô hình máy
-    local fuseCount = 0
-    for _, child in pairs(genModel:GetDescendants()) do
-        if (child.Name == "Fuel" or child.Name == "Fuse") and (child:IsA("Model") or child:IsA("BasePart")) then
-            fuseCount = fuseCount + 1
-        end
-    end
-    if fuseCount >= 2 then return true end
-
-    -- Cách 3: Kiểm tra nút bấm biến mất (Khi đủ xăng máy thường khóa tương tác)
-    local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genModel:FindFirstChildOfClass("ProximityPrompt")
-    if prompt and not prompt.Enabled then
-        return true
-    end
-
     return false
 end
 
 -- =========================================================================
--- 🔥 HÀM TWEEN DÒ ĐƯỜNG AN TOÀN TỚI MÁY PHÁT ĐIỆN
+-- 🔥 HÀM DI CHUYỂN TWEEN AN TOÀN
 -- =========================================================================
-local function tweenToGenerator(rootPart, genPart)
-    if not rootPart or not genPart then return false end
+local function tweenToGenerator(root, targetPart)
+    local targetPos = targetPart.Position + Vector3.new(0, 2, 0)
+    local distance = (root.Position - targetPos).Magnitude
+    local duration = distance / TWEEN_SPEED
+
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(targetPos)})
     
-    local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true})
-    local success, err = pcall(function()
-        path:ComputeAsync(rootPart.Position, genPart.Position)
-    end)
-    
-    if success and path.Status == Enum.PathStatus.Success then
-        for _, waypoint in ipairs(path:GetWaypoints()) do
-            local expectedCFrame = CFrame.new(waypoint.Position.X, waypoint.Position.Y + 2, waypoint.Position.Z)
-            local dist = (rootPart.Position - waypoint.Position).Magnitude
-            local tween = TweenService:Create(rootPart, TweenInfo.new(dist / TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = expectedCFrame})
-            tween:Play()
-            tween.Completed:Wait()
-        end
-        return true
-    else
-        rootPart.CFrame = CFrame.new(genPart.Position + Vector3.new(0, 2, 0))
-        return true
-    end
+    tween:Play()
+    tween.Completed:Wait()
 end
 
 -- =========================================================================
--- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 2
+-- ⚡ LUỒNG XỬ LÝ CHÍNH CỦA STAGE 2
 -- =========================================================================
-print("[STAGE 2] Tiến về máy phát điện để nạp Fuel...")
+print("[STAGE 2] Đang di chuyển về máy phát điện để nạp tài nguyên...")
 
+local genPart = getGenerator()
 local char = localPlayer.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
 
-if root then
-    local genPart = getGenerator()
-    if genPart then
-        -- 1. Di chuyển lướt Tween mượt mà đến sát cạnh máy phát điện
-        local distance = (root.Position - genPart.Position).Magnitude
-        if distance > 4 then
-            tweenToGenerator(root, genPart)
-        end
-        
-        -- 2. Thực hiện hành động tương tác đổ xăng vào máy
-        local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
-        if prompt then
-            fireproximityprompt(prompt)
-        else
-            root.CFrame = CFrame.new(genPart.Position) -- Ép chạm vật lý để nạp đồ
-        end
-        
-        task.wait(0.8) -- Chờ game xử lý cập nhật trạng thái nhận vật phẩm
-        
-        -- 3. 🔥 ĐIỀU KIỆN QUYẾT ĐỊNH RẼ NHÁNH LUỒNG
-        if isGeneratorFullyLoaded(genPart) then
-            -- Trường hợp ĐỦ ĐỒ -> Chuyển giao thẳng lên Stage 3
-            print("[🎯 STAGE 2 SUCCESS] Đã xác nhận đủ 2 Fuse/Fuel trên máy phát điện!")
-            task.wait(0.2)
-            _G.CurrentStage = 3
-            return true
-        else
-            -- Trường hợp THIẾU ĐỒ -> Quay đầu chạy lại Stage 1 ngay lập tức
-            print("[⚠️ STAGE 2 FAILED] Máy chưa đủ 2 bình xăng! Tự động kích hoạt lại Stage 1 để đi tìm kiếm tiếp...")
-            task.wait(0.2)
-            _G.CurrentStage = 1
-            return false
-        end
+if root and genPart then
+    -- 1. Tween di chuyển mượt mà áp sát máy phát điện
+    local distance = (root.Position - genPart.Position).Magnitude
+    if distance > 4 then
+        tweenToGenerator(root, genPart)
+    end
+    
+    -- 2. Thực hiện hành động tương tác đổ vật phẩm vào máy
+    local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
+    if prompt then
+        fireproximityprompt(prompt)
     else
-        -- Nếu không tìm thấy máy, quay lại Stage 1 quét tài nguyên tránh treo acc
-        print("[⚠️] Không tìm thấy máy phát điện, trả luồng về Stage 1...")
+        root.CFrame = CFrame.new(genPart.Position) -- Ép chạm vật lý để nạp đồ
+    end
+    
+    task.wait(1.0) -- Chờ 1 giây để game xử lý cập nhật dữ liệu máy phát điện từ server
+    
+    -- 3. 🔥 KIỂM TRA ĐIỀU KIỆN CHUYỂN STAGE THEO DỮ LIỆU ĐÃ SPY
+    if isGeneratorStage2(genPart) then
+        -- Trường hợp máy ĐÃ LÊN CẤP 2 -> Chuyển sang đi trạm điện Stage 3
+        print("[🎯 STAGE 2 SUCCESS] Xác nhận Máy phát điện đã đạt cấp 2! Chuyển sang Stage 3.")
+        task.wait(0.2)
+        _G.CurrentStage = 3
+        return true
+    else
+        -- Trường hợp máy CHƯA LÊN CẤP 2 -> Quay đầu chạy lại Stage 1 lấy thêm Fuse/Fuel
+        print("[⚠️ STAGE 2 FAILED] Máy chưa lên cấp 2! Tự động quay lại Stage 1 để lấy thêm Fuse...")
+        task.wait(0.2)
         _G.CurrentStage = 1
         return false
     end
+else
+    -- Nếu không tìm thấy máy, tự động hồi quy về Stage 1 để chống kẹt acc
+    warn("[❌ STAGE 2 ERROR] Không tìm thấy Generator trên bản đồ! Quay lại Stage 1...")
+    _G.CurrentStage = 1
+    return false
 end
-
-task.wait(0.2)
