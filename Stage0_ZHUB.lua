@@ -74,16 +74,18 @@ task.spawn(function()
         end
         
         -- Phương án quét vật lý tìm TextLabel giống đoạn code cũ
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") and (v.Text == "Auto Drag" or string.find(v.Text, "Auto Drag")) then
-                local p = v.Parent
-                if p then
-                    local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton") or p.Parent:FindFirstChildOfClass("TextButton")
-                    if toggleBtn then
-                        fireClickEvents(toggleBtn)
-                        dragSuccess = true
-                        print("[✔️ SUCCESS] Đã ép bật Auto Drag thành công bằng cách quét UI!");
-                        break
+        if not dragSuccess then
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and (v.Text == "Auto Drag" or string.find(v.Text, "Auto Drag")) then
+                    local p = v.Parent
+                    if p then
+                        local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton") or p.Parent:FindFirstChildOfClass("TextButton")
+                        if toggleBtn then
+                            fireClickEvents(toggleBtn)
+                            dragSuccess = true
+                            print("[✔️ SUCCESS] Đã ép bật Auto Drag thành công bằng cách quét UI!");
+                            break
+                        end
                     end
                 end
             end
@@ -113,16 +115,18 @@ task.spawn(function()
         end
         
         -- Phương án quét vật lý tìm TextLabel của Kill Aura
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") and (v.Text == "Kill Aura" or string.find(v.Text, "Kill Aura")) then
-                local p = v.Parent
-                if p then
-                    local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton") or p.Parent:FindFirstChildOfClass("TextButton")
-                    if toggleBtn then
-                        fireClickEvents(toggleBtn)
-                        auraSuccess = true
-                        print("[✔️ SUCCESS] Đã ép bật Kill Aura thành công bằng cách quét UI!");
-                        break
+        if not auraSuccess then
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and (v.Text == "Kill Aura" or string.find(v.Text, "Kill Aura")) then
+                    local p = v.Parent
+                    if p then
+                        local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton") or p.Parent:FindFirstChildOfClass("TextButton")
+                        if toggleBtn then
+                            fireClickEvents(toggleBtn)
+                            auraSuccess = true
+                            print("[✔️ SUCCESS] Đã ép bật Kill Aura thành công bằng cách quét UI!");
+                            break
+                        end
                     end
                 end
             end
