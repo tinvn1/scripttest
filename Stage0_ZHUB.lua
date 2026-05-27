@@ -3,22 +3,42 @@ if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
-print("[🚀 STAGE 0] Khởi động luồng ZHUB - Sửa lỗi bấm quá nhanh gây nuốt nút!");
+print("[🚀 STAGE 0] Khởi động luồng KIỂM SOÁT TRẠNG THÁI - Chống nuốt nút ZHUB!");
 
 -- Khởi chạy Menu ZHUB bằng pcall bảo vệ luồng chính
 pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
 end)
 
--- 🕒 Đợi hẳn 5 giây ban đầu để ZHUB ổn định bộ nhớ và tạo đầy đủ các phần tử UI ngầm
-task.wait(5) 
+-- Đợi 5 giây ban đầu để ZHUB khởi tạo cấu trúc và nạp các cài đặt cấu hình ngầm
+task.wait(5)
 
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Hàm mô phỏng click chuột vật lý an toàn và chậm rãi
-local function safeClick(button)
+-- Hàm tìm công tắc gạt (Toggle) nằm cạnh nhãn chữ chỉ định
+local function findToggle(buttonText)
+    local searchAreas = {CoreGui, PlayerGui}
+    for _, area in ipairs(searchAreas) do
+        for _, obj in pairs(area:GetDescendants()) do
+            if obj:IsA("TextLabel") and (obj.Text == buttonText or string.find(obj.Text, buttonText)) then
+                local row = obj.Parent
+                if row then
+                    -- Định vị trực tiếp phần tử TextButton/ImageButton gạt nằm cùng khung dòng (Row/Frame)
+                    local toggle = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
+                    if toggle then
+                        return toggle
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Hàm mô phỏng kích hoạt chuột sâu an toàn, giãn cách nhịp kết nối
+local function forceClick(button)
     if not button then return end
     local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
     for _, event in ipairs(events) do
@@ -27,7 +47,7 @@ local function safeClick(button)
                 if getconnections then
                     for _, connection in pairs(getconnections(button[event])) do
                         connection:Fire()
-                        task.wait(0.1) -- Giãn cách nhỏ giữa các kết nối ngầm
+                        task.wait(0.05) -- Giãn cách cực nhỏ chống nghẽn bộ giải trình
                     end
                 else
                     button[event]:Fire()
@@ -38,84 +58,69 @@ local function safeClick(button)
 end
 
 -- =========================================================================
--- 🔥 CHUỖI KÍCH HOẠT TUẦN TỰ CHẬM RÃI (BẤM XONG NÚT 1 MỚI SANG NÚT 2)
+-- 🔥 LUỒNG KIỂM SOÁT TUẦN TỰ CHẶT CHẼ TRÁNH XUNG ĐỘT TỐC ĐỘ
 -- =========================================================================
-local autoDragActivated = false
-local killAuraActivated = false
-
 task.spawn(function()
-    local searchAreas = {CoreGui, PlayerGui}
-
-    -- -------------------------------------------------------------------------
-    -- ⚔️ PHẦN 1: TÌM VÀ BẬT "KILL AURA" TRƯỚC
-    -- -------------------------------------------------------------------------
+    
+    -- 🚚 BƯỚC 1: ƯU TIÊN ÉP BẬT VÀ KIỂM TRA "AUTO DRAG" TRƯỚC
+    print("[⏳ ZHUB] Bắt đầu xử lý mục: Auto Drag...");
+    local dragSuccess = false
     for attempt = 1, 15 do
-        if killAuraActivated then break end
-        
-        for _, area in ipairs(searchAreas) do
-            for _, obj in pairs(area:GetDescendants()) do
-                if obj:IsA("TextLabel") and (obj.Text == "Kill Aura" or string.find(obj.Text, "Kill Aura")) then
-                    local row = obj.Parent
-                    if row then
-                        local toggleBtn = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
-                        if toggleBtn then
-                            safeClick(toggleBtn)
-                            killAuraActivated = true
-                            print("[✔️ STAGE 0] Bước 1: Kích hoạt thành công Kill Aura!");
-                            break
-                        end
-                    end
-                end
+        local dragToggle = findToggle("Auto Drag")
+        if dragToggle then
+            forceClick(dragToggle)
+            
+            -- Đợi một nhịp ngắn xem UI phản hồi trạng thái sáng đèn chưa
+            task.wait(0.5)
+            
+            -- Thử đồng bộ qua cấu hình môi trường Flags nếu có
+            if getgenv().Flags then
+                pcall(function()
+                    if getgenv().Flags["Auto Drag"] then getgenv().Flags["Auto Drag"]:Set(true) end
+                    if getgenv().Flags["AutoDrag"] then getgenv().Flags["AutoDrag"]:Set(true) end
+                end)
             end
-            if killAuraActivated then break end
+            
+            dragSuccess = true
+            print("[✔️ STAGE 0] Đã hoàn tất kích hoạt: Auto Drag!");
+            break
         end
-        task.wait(0.5) -- Đợi 0.5 giây giữa các lần quét thử lại nếu chưa tìm thấy
+        task.wait(0.5)
     end
 
-    -- 🕒 ĐỘ TRỄ QUYẾT ĐỊNH: Nghỉ hẳn 1.5 giây sau khi bật Kill Aura để UI game xả nghẽn lệnh!
-    print("[⏳ SYSTEM] Đang nghỉ 1.5 giây để tránh bị xung đột lệnh bấm nhanh...");
-    task.wait(1.5)
+    -- 🕒 KHOẢNG NGHỈ GIẢN CÁCH TUYỆT ĐỐI: Dừng hẳn 1.2 giây để UI xả sạch hàng đợi lệnh cũ
+    print("[⏳ SYSTEM] Nghỉ 1.2 giây để đồng bộ bộ nhớ giao diện...");
+    task.wait(1.2)
 
-    -- -------------------------------------------------------------------------
-    -- 🚚 PHẦN 2: TÌM VÀ BẬT "AUTO DRAG" SAU KHI UI ĐÃ ỔN ĐỊNH
-    -- -------------------------------------------------------------------------
+    -- ⚔️ BƯỚC 2: TIẾN HÀNH ÉP BẬT "KILL AURA" SAU KHI AUTO DRAG ỔN ĐỊNH
+    print("[⏳ ZHUB] Bắt đầu xử lý mục: Kill Aura...");
+    local auraSuccess = false
     for attempt = 1, 15 do
-        if autoDragActivated then break end
-        
-        for _, area in ipairs(searchAreas) do
-            for _, obj in pairs(area:GetDescendants()) do
-                if obj:IsA("TextLabel") and (obj.Text == "Auto Drag" or string.find(obj.Text, "Auto Drag")) then
-                    local row = obj.Parent
-                    if row then
-                        local toggleBtn = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton") or row.Parent:FindFirstChildOfClass("TextButton")
-                        if toggleBtn then
-                            safeClick(toggleBtn)
-                            autoDragActivated = true
-                            print("[✔️ STAGE 0] Bước 2: Kích hoạt thành công Auto Drag!");
-                            break
-                        end
-                    end
-                end
+        local auraToggle = findToggle("Kill Aura")
+        if auraToggle then
+            forceClick(auraToggle)
+            
+            -- Đợi một nhịp ngắn xem UI phản hồi trạng thái sáng đèn chưa
+            task.wait(0.5)
+            
+            -- Thử đồng bộ qua cấu hình môi trường Flags nếu có
+            if getgenv().Flags then
+                pcall(function()
+                    if getgenv().Flags["Kill Aura"] then getgenv().Flags["Kill Aura"]:Set(true) end
+                    if getgenv().Flags["KillAura"] then getgenv().Flags["KillAura"]:Set(true) end
+                end)
             end
-            if autoDragActivated then break end
+            
+            auraSuccess = true
+            print("[✔️ STAGE 0] Đã hoàn tất kích hoạt: Kill Aura!");
+            break
         end
-        task.wait(0.5) -- Đợi 0.5 giây giữa các lần quét thử lại nếu chưa tìm thấy
+        task.wait(0.5)
     end
 
-    -- 🛑 Kích hoạt bổ trợ bằng Flags môi trường (Nếu script ZHUB có hỗ trợ lưu trạng thái vào Flags)
-    if getgenv().Flags then
-        pcall(function()
-            if getgenv().Flags["Kill Aura"] then getgenv().Flags["Kill Aura"]:Set(true) end
-            if getgenv().Flags["KillAura"] then getgenv().Flags["KillAura"]:Set(true) end
-            task.wait(0.2)
-            if getgenv().Flags["Auto Drag"] then getgenv().Flags["Auto Drag"]:Set(true) end
-            if getgenv().Flags["AutoDrag"] then getgenv().Flags["AutoDrag"]:Set(true) end
-        end)
-    end
-
-    -- Đợi thêm một nhịp ngắn trước khi chuyển giao hoàn toàn
-    task.wait(0.5)
-    print("[🚀 SYSTEM] Đã mở thành công cả 2 chức năng một cách an toàn. Chuyển sang Stage 1!");
+    -- Khóa bảo vệ nhịp cuối trước khi bàn giao luồng
+    task.wait(0.8)
+    print("[🚀 SYSTEM] Toàn bộ 2 chức năng đã mở thành công và an toàn! Chuyển giao sang Stage 1 nhặt Fuel...");
     
     _G.CurrentStage = 1
 end)
