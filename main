@@ -6,61 +6,78 @@ end
 local startTimeGlobal = os.clock()
 local isForcedRejoining = false -- Biến trạng thái chặn chạy tiếp khi đang Rejoin
 
-print("[⚡ CRITICAL SYSTEM] Khởi động Main Loader - Ép giới hạn cứng Rejoin đúng 2 phút!");
+print("[⚡ CRITICAL SYSTEM] Khởi động Main Loader - Đã vá lỗi crash do ZHUB!");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
 -- =========================================================================
--- ⏱️ LUỒNG ÉP REJOIN KHẨN CẤP ĐÚNG 2 PHÚT (CHẠY SONG SONG NGAY TỪ ĐẦU)
+-- 🚀 ĐỊNH NGHĨA TRƯỚC STAGE 5 GLOBAL (ĐỂ KHÔNG BỊ LỖI NIL VALUE KHI STAGE 3 GỌI KHẨN CẤP)
 -- =========================================================================
-task.spawn(function()
-    local TeleportService = game:GetService("TeleportService")
+_G.runOptimizedStage5 = function()
+    if isForcedRejoining then return end
+    isForcedRejoining = true
+    print("[🚀 STAGE 5 GLOBAL] Kích hoạt tiến trình kết thúc trận và Reset Server...");
+
     local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    local RunService = game:GetService("RunService")
     local localPlayer = Players.LocalPlayer
 
-    -- Vòng lặp kiểm tra liên tục mỗi 0.1 giây để bắt trúng mốc thời gian
-    while not isForcedRejoining do
-        local elapsed = os.clock() - startTimeGlobal
-        
-        -- 🔥 NẾU CHẠM HOẶC VƯỢT QUÁ 2 PHÚT (120 GIÂY) -> ÉP REJOIN LẬP TỨC
-        if elapsed >= 120 then
-            isForcedRejoining = true
-            print("[⚠️ CRITICAL TIMEOUT] Đã chạm mốc 2 phút! Ép kích hoạt Rejoin Stage 5 ngay lập tức...");
-            
-            -- Thực hiện kích click bọc lót nếu nút Play Again có sẵn trên màn hình
-            local PlayerGui = localPlayer:WaitForChild("PlayerGui")
-            for _, obj in pairs(PlayerGui:GetDescendants()) do
-                if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
-                    if obj.Visible and obj.AbsolutePosition.Y > 0 then
-                        if getconnections then
-                            for _, connection in pairs(getconnections(obj.MouseButton1Click)) do connection:Fire() end
-                        end
-                        obj.MouseButton1Click:Fire()
-                        break
-                    end
+    local PlayerGui = localPlayer:WaitForChild("PlayerGui")
+    local foundButton = nil
+    local startTime = os.clock()
+    
+    -- Đợi tối đa 10 giây xem UI nút Kết thúc/Chơi lại có xuất hiện không
+    while not foundButton and (os.clock() - startTime) < 10 do
+        for _, obj in pairs(PlayerGui:GetDescendants()) do
+            if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
+                if obj.Visible and obj.AbsolutePosition.Y > 0 then
+                    foundButton = obj
+                    break
                 end
             end
-            
-            -- Lệnh ép nhảy Server khẩn cấp Bypass qua mọi tiến trình khác
-            local teleportOptions = Instance.new("TeleportOptions")
-            teleportOptions.ServerInstanceId = game.JobId
-            
-            -- Thực hiện vòng lặp ép Teleport cho tới khi thành công (đề phòng lỗi mạng)
-            while true do
-                pcall(function()
-                    TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
-                end)
-                task.wait(1) -- Chờ 1 giây rồi thử lại nếu chưa bay Server
-            end
+        end
+        if foundButton then break end
+        RunService.Heartbeat:Wait()
+    end
+    
+    -- Click nút nếu tìm thấy
+    if foundButton then
+        if getconnections then
+            for _, connection in pairs(getconnections(foundButton.MouseButton1Click)) do connection:Fire() end
+        end
+        foundButton.MouseButton1Click:Fire()
+    end
+    
+    -- Thống nhất Teleport nhảy sang server mới an toàn
+    local teleportOptions = Instance.new("TeleportOptions")
+    teleportOptions.ServerInstanceId = game.JobId
+    while true do
+        pcall(function()
+            TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
+        end)
+        task.wait(1)
+    end
+end
+
+-- =========================================================================
+-- ⏱️ LUỒNG ÉP REJOIN KHẨN CẤP ĐÚNG 2 PHÚT (CHẠY SONG SƠNG)
+-- =========================================================================
+task.spawn(function()
+    while not isForcedRejoining do
+        local elapsed = os.clock() - startTimeGlobal
+        if elapsed >= 120 then
+            print("[⚠️ CRITICAL TIMEOUT] Quá mốc 2 phút! Kích hoạt thoát hiểm Rejoin server mới...");
+            _G.runOptimizedStage5()
             break
         end
-        task.wait(0.1)
+        task.wait(0.5)
     end
 end)
 
--- Hàm nạp file từ GitHub có kiểm tra trạng thái ép Rejoin
+-- Hàm nạp file an toàn từ GitHub
 local function runFile(fileName)
-    if isForcedRejoining then return end -- Nếu đã quá 2 phút thì không nạp file mới nữa
+    if isForcedRejoining then return end
 
     local success, content = pcall(function() 
         return game:HttpGet(baseUrl .. fileName) 
@@ -83,89 +100,93 @@ local function runFile(fileName)
 end
 
 -- =========================================================================
--- 🛡️ GIAI ĐOẠN 0: KHỞI CHẠY ZHUB VÀ THIẾT LẬP MENU PHỤ TRỢ
+-- 🛡️ GIAI ĐOẠN 0: KHỞI CHẠY ZHUB (ĐÃ BỌC PCALL CHỐNG CRASH)
 -- =========================================================================
 local function initializeZHub()
     if isForcedRejoining then return end
     
-    local successLoad, errLoad = pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
-    end)
-    
-    if not successLoad then return end
-
-    local Players = game:GetService("Players")
-    local player = Players.LocalPlayer
-    local targetGui = nil
-
-    for i = 1, 15 do
-        if isForcedRejoining then return end
-        targetGui = game:GetService("CoreGui"):FindFirstChild("ZHUB") or player.PlayerGui:FindFirstChild("ZHUB") or game:GetService("CoreGui"):FindFirstChildOfClass("ScreenGui")
-        if targetGui then break end
-        task.wait(0.2)
-    end
-
-    local function clickButton(btn)
-        if btn then
-            local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
-            for _, event in ipairs(events) do
-                if btn[event] then
-                    if getconnections then
-                        for _, connection in pairs(getconnections(btn[event])) do connection:Fire() end
-                    else
-                        btn[event]:Fire()
-                    end
-                end
-            end
-        end
-    end
-
-    if getgenv().Flags then
-        if getgenv().Flags["Auto Drag"] ~= nil then getgenv().Flags["Auto Drag"]:Set(true)
-        elseif getgenv().Flags["AutoDrag"] ~= nil then getgenv().Flags["AutoDrag"]:Set(true) end
-    end
-
-    if targetGui then
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") and v.Text == "Auto Drag" then
-                local p = v.Parent
-                if p then
-                    local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton")
-                    if toggleBtn then clickButton(toggleBtn) end
-                end
-            end
-        end
+    -- 🌟 VÁ LỖI CHÍ MẠNG: Sử dụng pcall bọc toàn bộ luồng load ZHUB ngoại lai
+    local overallSuccess, overallError = pcall(function()
+        local successLoad, errLoad = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
+        end)
         
-        local combatTabBtn = nil
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") and v.Text == "Combat" then
-                combatTabBtn = v:FindFirstAncestorOfClass("TextButton") or v:FindFirstAncestorOfClass("ImageButton") or v.Parent
-                break
-            end
-        end
-        
-        if combatTabBtn then
-            clickButton(combatTabBtn)
+        if not successLoad then return end
+
+        local Players = game:GetService("Players")
+        local player = Players.LocalPlayer
+        local targetGui = nil
+
+        for i = 1, 10 do
+            targetGui = game:GetService("CoreGui"):FindFirstChild("ZHUB") or player.PlayerGui:FindFirstChild("ZHUB")
+            if targetGui then break end
             task.wait(0.2)
         end
 
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") and v.Text == "Kill Aura" then
-                local row = v.Parent
-                if row then
-                    local toggleBtn = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton")
-                    if toggleBtn then
-                        clickButton(toggleBtn)
-                        print("[🎯 ZHUB] Đã đồng bộ bật Auto Drag + Kill Aura!");
-                        break
+        local function clickButton(btn)
+            if btn then
+                local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
+                for _, event in ipairs(events) do
+                    if btn[event] then
+                        if getconnections then
+                            for _, connection in pairs(getconnections(btn[event])) do connection:Fire() end
+                        else
+                            btn[event]:Fire()
+                        end
                     end
                 end
             end
         end
+
+        if getgenv().Flags then
+            if getgenv().Flags["Auto Drag"] ~= nil then getgenv().Flags["Auto Drag"]:Set(true)
+            elseif getgenv().Flags["AutoDrag"] ~= nil then getgenv().Flags["AutoDrag"]:Set(true) end
+        end
+
+        if targetGui then
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Text == "Auto Drag" then
+                    local p = v.Parent
+                    if p then
+                        local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton")
+                        if toggleBtn then clickButton(toggleBtn) end
+                    end
+                end
+            end
+            
+            local combatTabBtn = nil
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Text == "Combat" then
+                    combatTabBtn = v:FindFirstAncestorOfClass("TextButton") or v:FindFirstAncestorOfClass("ImageButton") or v.Parent
+                    break
+                end
+            end
+            
+            if combatTabBtn then
+                clickButton(combatTabBtn)
+                task.wait(0.1)
+            end
+
+            for _, v in pairs(targetGui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Text == "Kill Aura" then
+                    local row = v.Parent
+                    if row then
+                        local toggleBtn = row:FindFirstChildOfClass("TextButton") or row:FindFirstChildOfClass("ImageButton")
+                        if toggleBtn then clickButton(toggleBtn) end
+                    end
+                end
+            end
+        end
+    end)
+
+    if not overallSuccess then
+        warn("[⚠️ ZHUB HOOK WARN] ZHUB bị lỗi cấu trúc framework Knit cũ bẻ gãy, hệ thống đã tự động cách ly lỗi thành công để chạy tiếp map!");
+    else
+        print("[🎯 ZHUB] Kích hoạt và đồng bộ ZHUB thành công!");
     end
 end
 
--- Chạy ZHUB
+-- Chạy ZHUB an toàn
 initializeZHub()
 
 -- =========================================================================
@@ -176,25 +197,23 @@ task.spawn(function()
 end)
 
 -- =========================================================================
--- 🔄 LUỒNG TỰ ĐỘNG CHẠY CÁC STAGE TUẦN TỰ (SẼ BỊ CẮT NGANG NẾU QUÁ 2 PHÚT)
+-- 🔄 LUỒNG TỰ ĐỘNG CHẠY CÁC STAGE TUẦN TỰ MƯỢT MÀ
 -- =========================================================================
 runFile("Stage1_GetFuel.lua")   
 runFile("Stage2_ReturnGen.lua") 
-runFile("Stage3_RepairBox.lua") 
+runFile("Stage3_RepairBox.lua") -- Luồng Stage 3 mới sẽ tự động ném về Stage 5 nếu kẹt quá 5 lần
 
 -- =========================================================================
--- 🛠️ STAGE 4: TỰ SỬA MÁY PHÁT ĐIỆN KHI TIẾP CẬN SÁT (KHÔNG LỖI ROBUX)
+-- 🛠️ STAGE 4: TỰ SỬA MÁY PHÁT ĐIỆN KHI TIẾP CẬN SÁT
 -- =========================================================================
 local function runOptimizedStage4()
     if isForcedRejoining then return end
-    print("[🛠️ STAGE 4] Hệ thống Main chuyển giao luồng sửa máy phát điện...")
-    
-    task.wait(0.5) -- Cho game giải tỏa nghẽn mạng từ Stage 3 di chuyển
+    print("[🛠️ STAGE 4] Hệ thống Main chuyển giao luồng sửa máy phát điện...");
+    task.wait(0.3)
 
     local Workspace = game:GetService("Workspace")
     local localPlayer = game:GetService("Players").LocalPlayer
 
-    -- Hàm tìm chính xác khối tương tác "Prompt" trong Power Box
     local function getPowerBoxPromptPart()
         for _, obj in pairs(Workspace:GetDescendants()) do
             if obj:IsA("Model") and obj.Name == "Power Box" then
@@ -210,7 +229,6 @@ local function runOptimizedStage4()
     local promptPart = nil
     local checkAttempts = 0
 
-    -- Chủ động quét tìm khối Prompt (Quét tối đa 25 lần)
     repeat
         if isForcedRejoining then return end
         promptPart = getPowerBoxPromptPart()
@@ -221,16 +239,15 @@ local function runOptimizedStage4()
     until promptPart or checkAttempts >= 25
 
     if not promptPart then
-        warn("[❌ STAGE 4 ERROR] Không quét được khối Prompt! Buộc bỏ qua để sang Stage 5...")
+        warn("[❌ STAGE 4 ERROR] Không quét được khối Prompt! Ép chuyển sang Stage 5...");
         return false
     end
 
-    print("[🖱️] Đã tìm thấy khối Prompt. Tiến hành giữ nút sửa máy an toàn...")
+    print("[🖱️] Đã tìm thấy khối Prompt. Tiến hành giữ nút sửa máy phát điện...");
 
     local repairStarted = true
     local startTime = os.clock()
 
-    -- Luồng ép click/touch tương tác song song tần suất an toàn (0.25s) tránh hiện bảng Robux
     task.spawn(function()
         while repairStarted and promptPart and promptPart.Parent and not isForcedRejoining do
             local char = localPlayer.Character
@@ -252,10 +269,9 @@ local function runOptimizedStage4()
         end
     end)
 
-    -- Vòng lặp đếm giờ chính xác 16 giây để hoàn thành Stage 4
     while (os.clock() - startTime) < 16 and not isForcedRejoining do
         if not promptPart or not promptPart.Parent then
-            print("[🎯 STAGE 4 SUCCESS] Khối Prompt biến mất sớm. Sửa thành công!")
+            print("[🎯 STAGE 4 SUCCESS] Khối Prompt biến mất sớm. Sửa thành công!");
             break
         end
         task.wait(0.1)
@@ -267,55 +283,7 @@ local function runOptimizedStage4()
 end
 
 -- =========================================================================
--- 🚀 STAGE 5: ĐỢI NÚT PLAY AGAIN HOẶC ÉP ĐỔI SERVER SẠCH SẼ
--- =========================================================================
-local function runOptimizedStage5()
-    if isForcedRejoining then return end
-    print("[🚀 STAGE 5] Kích hoạt tiến trình kết thúc trận và Reset Server...");
-
-    local Players = game:GetService("Players")
-    local TeleportService = game:GetService("TeleportService")
-    local RunService = game:GetService("RunService")
-    local localPlayer = Players.LocalPlayer
-
-    local PlayerGui = localPlayer:WaitForChild("PlayerGui")
-    local foundButton = nil
-    local startTime = os.clock()
-    
-    -- Đợi tối đa 15 giây xem UI nút Kết thúc/Chơi lại có xuất hiện không
-    while not foundButton and (os.clock() - startTime) < 15 and not isForcedRejoining do
-        for _, obj in pairs(PlayerGui:GetDescendants()) do
-            if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
-                if obj.Visible and obj.AbsolutePosition.Y > 0 then
-                    foundButton = obj
-                    break
-                end
-            end
-        end
-        if foundButton then break end
-        RunService.Heartbeat:Wait()
-    end
-    
-    -- Click nút và thực hiện đổi server ngay lập tức
-    if foundButton and not isForcedRejoining do
-        if getconnections then
-            for _, connection in pairs(getconnections(foundButton.MouseButton1Click)) do connection:Fire() end
-        end
-        foundButton.MouseButton1Click:Fire()
-    end
-    
-    -- Teleport dọn dẹp nhảy sang server mới
-    if not isForcedRejoining then
-        local teleportOptions = Instance.new("TeleportOptions")
-        teleportOptions.ServerInstanceId = game.JobId
-        pcall(function()
-            TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
-        end)
-    end
-end
-
--- =========================================================================
--- 🏃 CHẠY TUẦN TỰ CÁC GIAI ĐOẠN CUỐI
+-- KÍCH HOẠT CHẠY GIAI ĐOẠN CUỐI CÙNG
 -- =========================================================================
 runOptimizedStage4()
-runOptimizedStage5()
+_G.runOptimizedStage5()
