@@ -155,4 +155,3 @@ task.wait(0.2)
 
 _G.CurrentStage = 4
 return true
-cải tiến stage 3
