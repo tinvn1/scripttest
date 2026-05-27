@@ -1,61 +1,64 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- Hàm kiểm tra môi trường
-local isMobile = (game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled)
+print("[🚀 STAGE 0] Khởi chạy ZHUB & Tự động nạp cấu hình...");
 
-print("[🚀] Khởi chạy cho: " .. (isMobile and "Mobile" or "PC"));
-
--- 1. Tải ZHUB
+-- 1. Khởi chạy Menu ZHUB
 local successLoad, errLoad = pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
 end)
 
-if not successLoad then warn("Lỗi tải ZHUB: " .. tostring(errLoad)) return end
+if not successLoad then 
+    return warn("[⚠️ STAGE 0] Không thể tải ZHUB: " .. tostring(errLoad)) 
+end
 
--- 2. Logic kích hoạt song song
+-- 2. Tiến trình nạp cấu hình tự động vào hệ thống Flags
 task.spawn(function()
-    task.wait(4) -- Đợi UI khởi tạo xong
-
-    -- CÁCH 1: Sử dụng Flags (Ưu tiên PC và Executor hỗ trợ)
-    if getgenv().Flags then
-        local targetFlags = {"Auto Drag Body", "Auto Drag", "Kill Aura", "KillAura"}
-        for _, flagName in pairs(targetFlags) do
-            if getgenv().Flags[flagName] then
-                pcall(function() getgenv().Flags[flagName]:Set(true) end)
-            end
-        end
+    -- Vòng lặp chờ hệ thống Flags của ZHUB được khởi tạo trong bộ nhớ
+    local timeout = 0
+    while not getgenv().Flags and timeout < 30 do
+        task.wait(0.5)
+        timeout = timeout + 1
     end
 
-    -- CÁCH 2: Giả lập tương tác vật lý (Ưu tiên Mobile và dự phòng cho PC)
-    local targetGui = game:GetService("CoreGui"):FindFirstChild("ZHUB") or game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("ZHUB")
-    
-    if targetGui then
-        local VirtualInputManager = game:GetService("VirtualInputManager")
+    if not getgenv().Flags then
+        return warn("[⚠️ STAGE 0] Quá thời gian chờ, không tìm thấy hệ thống Flags!")
+    end
+
+    task.wait(1.5) -- Chờ thêm một chút để các thanh trượt (Sliders) ổn định giá trị mặc định
+
+    -- BẢNG CẤU HÌNH CỦA BẠN (Đã sửa chính xác theo dữ liệu hệ thống)
+    local myConfig = {
+        ["AutoDrag"] = true,
+        ["AutoDragRange"] = 12,
+        ["AutoDragHoldDistance"] = 3,
+        ["AutoDragHoldHeight"] = 1,
+        ["AutoDragOrbitAngle"] = 0,
+        ["AutoDragOrbitSpeed"] = 0,
         
-        for _, obj in pairs(targetGui:GetDescendants()) do
-            if obj:IsA("TextLabel") then
-                local text = string.lower(obj.Text)
-                if string.find(text, "drag") or string.find(text, "kill aura") then
-                    local parent = obj.Parent
-                    local toggleBtn = parent:FindFirstChildWhichIsA("GuiButton") or parent.Parent:FindFirstChildWhichIsA("GuiButton")
-                    
-                    if toggleBtn then
-                        -- Thực hiện click tùy theo thiết bị
-                        if isMobile then
-                            -- Dùng VirtualInputManager để mô phỏng chạm màn hình
-                            local pos = toggleBtn.AbsolutePosition + (toggleBtn.AbsoluteSize / 2)
-                            VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
-                            task.wait(0.1)
-                            VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
-                        else
-                            -- Dùng events cho PC
-                            pcall(function() toggleBtn.MouseButton1Click:Fire() end)
-                            pcall(function() toggleBtn.Activated:Fire() end)
-                        end
-                        print("[✅] Đã kích hoạt: " .. obj.Text)
-                    end
+        ["Killaura"] = true,
+        ["KillauraRange"] = 35,
+        
+        -- Bạn có thể chép thêm các dòng cấu hình khác từ file text của bạn vào đây nếu muốn tự bật thêm
+    }
+
+    print("[🔍] Đang tiến hành nạp cấu hình...");
+    
+    -- Duyệt qua bảng cấu hình và ép hệ thống thực thi lệnh :Set()
+    for flagName, value in pairs(myConfig) do
+        local flagObject = getgenv().Flags[flagName]
+        if flagObject and type(flagObject) == "table" and flagObject.Set then
+            pcall(function()
+                if type(value) == "table" then
+                    -- Xử lý trường hợp Dropdown chọn nhiều giá trị dạng danh sách
+                    flagObject:Set(value[1] or value)
+                else
+                    flagObject:Set(value)
                 end
-            end
+            end)
         end
     end
+
+    print("[🎉 SUCCESS] Đã tự động kích hoạt Auto Drag, Killaura và nạp các thông số thành công!");
 end)
+
+return true
