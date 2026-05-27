@@ -17,21 +17,15 @@ local function getGenerator()
 end
 
 -- =========================================================================
--- 🔥 HÀM DÙNG DỮ LIỆU SPY ĐỂ CHECK XEM GENERATOR ĐÃ LÊN CẤP 2 CHƯA
+-- 🔥 HÀM CHECK ATTRIBUTE "STAGE" (XEM MÁY ĐÃ ĐẠT CẤP 2 THỰC SỰ CHƯA)
 -- =========================================================================
-local function isGeneratorStage2(genPart)
+local function checkIsStage2(genPart)
     if not genPart then return false end
-    
-    -- Lấy Model gốc của máy phát điện (Thường là Parent của Part chính)
     local genModel = genPart:IsA("Model") and genPart or genPart.Parent
-    
     if genModel then
-        -- Đọc dữ liệu thuộc tính ẩn "Stage" mà script Spy đã quét được
         local currentStage = genModel:GetAttribute("Stage")
-        
         if currentStage then
-            print("[🕵️ SYSTEM CHECK] Thuộc tính Stage hiện tại của Generator là: " .. tostring(currentStage))
-            -- Nếu giá trị thuộc tính Stage từ 2 trở lên -> Máy đã lên cấp 2 thành công
+            print("[🕵️ SPY CHECK] Giá trị thuộc tính 'Stage' đọc được: " .. tostring(currentStage))
             if tonumber(currentStage) >= 2 then
                 return true
             end
@@ -79,25 +73,36 @@ if root and genPart then
         root.CFrame = CFrame.new(genPart.Position) -- Ép chạm vật lý để nạp đồ
     end
     
-    task.wait(1.0) -- Chờ 1 giây để game xử lý cập nhật dữ liệu máy phát điện từ server
+    print("[⏳] Đang đợi 1.5 giây để Server cập nhật và thẩm định dữ liệu nâng cấp...")
+    task.wait(1.5) -- Tăng thời gian chờ ban đầu để animation đổ đồ chạy xong hoàn toàn
     
-    -- 3. 🔥 KIỂM TRA ĐIỀU KIỆN CHUYỂN STAGE THEO DỮ LIỆU ĐÃ SPY
-    if isGeneratorStage2(genPart) then
-        -- Trường hợp máy ĐÃ LÊN CẤP 2 -> Chuyển sang đi trạm điện Stage 3
-        print("[🎯 STAGE 2 SUCCESS] Xác nhận Máy phát điện đã đạt cấp 2! Chuyển sang Stage 3.")
+    -- 3. 🔥 BỘ LỌC KIỂM TRA ĐA TẦNG CHỐNG NHẢY VƯỢT STAGE LỖI
+    local isRealStage2 = false
+    
+    -- Vòng lặp check lại 3 lần liên tục để tránh trường hợp nhận diện sai do lag ping
+    for attempt = 1, 3 do
+        if checkIsStage2(genPart) then
+            isRealStage2 = true
+            break -- Nếu thấy lên cấp thật thì thoát vòng lặp ngay
+        end
+        print(string.format("[⚠️ ATTEMPT %d] Chưa thấy máy lên cấp 2, kiểm tra lại sau 0.5s...", attempt))
+        task.wait(0.5)
+    end
+    
+    -- 4. QUYẾT ĐỊNH RẼ NHÁNH CHUẨN XÁC
+    if isRealStage2 then
+        print("[🎯 STAGE 2 SUCCESS] Xác nhận Máy phát điện ĐÃ LÊN CẤP 2! Bàn giao sang Stage 3.")
         task.wait(0.2)
         _G.CurrentStage = 3
         return true
     else
-        -- Trường hợp máy CHƯA LÊN CẤP 2 -> Quay đầu chạy lại Stage 1 lấy thêm Fuse/Fuel
-        print("[⚠️ STAGE 2 FAILED] Máy chưa lên cấp 2! Tự động quay lại Stage 1 để lấy thêm Fuse...")
+        print("[⚠️ STAGE 2 FAILED] Máy CHƯA lên cấp 2 thực sự! Ép luồng trả về Stage 1 lấy thêm Fuse.")
         task.wait(0.2)
         _G.CurrentStage = 1
         return false
     end
 else
-    -- Nếu không tìm thấy máy, tự động hồi quy về Stage 1 để chống kẹt acc
-    warn("[❌ STAGE 2 ERROR] Không tìm thấy Generator trên bản đồ! Quay lại Stage 1...")
+    warn("[❌ STAGE 2 ERROR] Không tìm thấy Generator! Quay lại Stage 1 để bảo vệ luồng...")
     _G.CurrentStage = 1
     return false
 end
