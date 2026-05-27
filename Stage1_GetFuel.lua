@@ -42,5 +42,5 @@ end
 
 print("[STAGE 1] HOÀN THÀNH XUẤT SẮC!")
 task.wait(0.1)
-_G.StageCompleted = true 
+_G.CurrentStage = 2
 return true
