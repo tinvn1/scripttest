@@ -3,7 +3,7 @@ local TweenService = game:GetService("TweenService")
 local PathfindingService = game:GetService("PathfindingService")
 local RunService = game:GetService("RunService")
 local localPlayer = game:GetService("Players").LocalPlayer
-local TWEEN_SPEED = 60
+local TWEEN_SPEED = 45
 
 -- Cấu hình Pathfinding tối ưu né góc vật cản
 local path = PathfindingService:CreatePath({
