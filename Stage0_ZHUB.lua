@@ -1,54 +1,58 @@
--- Chờ trò chơi tải xong
 if not game:IsLoaded() then game.Loaded:Wait() end
 
-print("[🚀 STAGE 0] Khởi chạy cho Mobile...");
+-- Hàm kiểm tra môi trường
+local isMobile = (game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled)
 
--- Tải ZHUB
+print("[🚀] Khởi chạy cho: " .. (isMobile and "Mobile" or "PC"));
+
+-- 1. Tải ZHUB
 local successLoad, errLoad = pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
 end)
 
-if not successLoad then warn("Lỗi tải: " .. tostring(errLoad)) return end
+if not successLoad then warn("Lỗi tải ZHUB: " .. tostring(errLoad)) return end
 
+-- 2. Logic kích hoạt song song
 task.spawn(function()
-    task.wait(5) -- Đợi lâu hơn một chút cho mobile load UI
-    
-    local UserInputService = game:GetService("UserInputService")
-    
-    -- Hàm Click tương thích cả PC và Mobile
-    local function touchClick(button)
-        if not button then return end
-        
-        -- Thử các sự kiện click thông thường
-        pcall(function() button.MouseButton1Click:Fire() end)
-        
-        -- Kích hoạt sự kiện cảm ứng cho mobile
-        if button:IsA("GuiButton") then
-            button.Activated:Fire()
+    task.wait(4) -- Đợi UI khởi tạo xong
+
+    -- CÁCH 1: Sử dụng Flags (Ưu tiên PC và Executor hỗ trợ)
+    if getgenv().Flags then
+        local targetFlags = {"Auto Drag Body", "Auto Drag", "Kill Aura", "KillAura"}
+        for _, flagName in pairs(targetFlags) do
+            if getgenv().Flags[flagName] then
+                pcall(function() getgenv().Flags[flagName]:Set(true) end)
+            end
         end
-        
-        -- Nếu executor có hỗ trợ VirtualInputManager
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-        local pos = button.AbsolutePosition + (button.AbsoluteSize / 2)
-        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
-        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
     end
 
-    -- Quét tìm nút và kích hoạt
+    -- CÁCH 2: Giả lập tương tác vật lý (Ưu tiên Mobile và dự phòng cho PC)
     local targetGui = game:GetService("CoreGui"):FindFirstChild("ZHUB") or game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("ZHUB")
     
     if targetGui then
-        for _, v in pairs(targetGui:GetDescendants()) do
-            if v:IsA("TextLabel") then
-                local text = string.lower(v.Text)
-                if string.find(text, "drag body") or string.find(text, "kill aura") then
-                    -- Tìm nút cha hoặc nút cùng cấp gần nhất
-                    local p = v.Parent
-                    local toggleBtn = p:FindFirstChildWhichIsA("GuiButton") or p.Parent:FindFirstChildWhichIsA("GuiButton")
+        local VirtualInputManager = game:GetService("VirtualInputManager")
+        
+        for _, obj in pairs(targetGui:GetDescendants()) do
+            if obj:IsA("TextLabel") then
+                local text = string.lower(obj.Text)
+                if string.find(text, "drag") or string.find(text, "kill aura") then
+                    local parent = obj.Parent
+                    local toggleBtn = parent:FindFirstChildWhichIsA("GuiButton") or parent.Parent:FindFirstChildWhichIsA("GuiButton")
                     
                     if toggleBtn then
-                        touchClick(toggleBtn)
-                        print("[✅] Đã kích hoạt trên mobile: " .. v.Text)
+                        -- Thực hiện click tùy theo thiết bị
+                        if isMobile then
+                            -- Dùng VirtualInputManager để mô phỏng chạm màn hình
+                            local pos = toggleBtn.AbsolutePosition + (toggleBtn.AbsoluteSize / 2)
+                            VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+                            task.wait(0.1)
+                            VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
+                        else
+                            -- Dùng events cho PC
+                            pcall(function() toggleBtn.MouseButton1Click:Fire() end)
+                            pcall(function() toggleBtn.Activated:Fire() end)
+                        end
+                        print("[✅] Đã kích hoạt: " .. obj.Text)
                     end
                 end
             end
