@@ -3,22 +3,22 @@ local RunService = game:GetService("RunService")
 local localPlayer = game:GetService("Players").LocalPlayer
 
 -- =========================================================================
--- 🔥 HÀM DÒ TÌM CHÍNH XÁC NÚT BẤM (PROXIMITYPROMPT) CỦA POWER PLANT
+-- 🔥 HÀM TÌM CHÍNH XÁC PART "PROMPT" THEO CẤU TRÚC ẢNH
 -- =========================================================================
-local function getPowerBoxPrompt()
+local function getPowerBoxPromptPart()
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") then
-            if obj.Parent and obj.Parent.Name == "Power Box" then
-                return obj
-            elseif string.find(string.lower(obj.ObjectText or ""), "power plant") or string.find(string.lower(obj.ActionText or ""), "repair") then
-                return obj
+        -- Tìm đúng Model "Power Box" có chứa Part tên là "Prompt"
+        if obj:IsA("Model") and obj.Name == "Power Box" then
+            local promptPart = obj:FindFirstChild("Prompt")
+            if promptPart and promptPart:IsA("BasePart") then
+                return promptPart
             end
         end
     end
     return nil
 end
 
-print("[🛠️ STAGE 4] Kích hoạt tự động sửa máy khi lại gần (An Toàn)...")
+print("[🛠️ STAGE 4] Kích hoạt tự động sửa máy theo cấu trúc Explorer mới...")
 
 local repairStarted = false
 local startTime = 0
@@ -29,66 +29,72 @@ stage4Connection = RunService.Heartbeat:Connect(function()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
     if root then
-        local prompt = getPowerBoxPrompt()
+        local promptPart = getPowerBoxPromptPart()
         
-        if prompt and prompt.Parent and prompt.Parent:IsA("BasePart") then
-            -- Tính khoảng cách giữa nhân vật và hộp điện
-            local distance = (root.Position - prompt.Parent.Position).Magnitude
+        if promptPart then
+            -- Tính khoảng cách thực tế giữa người chơi và khối "Prompt"
+            local distance = (root.Position - promptPart.Position).Magnitude
             
-            -- Chỉ kích hoạt khi khoảng cách lại gần (dưới 15 studs hoặc tùy bạn chỉnh)
-            if distance <= 15 then
-                
-                -- Cấu hình bypass các giới hạn cơ bản của game một lần duy nhất
-                if prompt.RequiresLineOfSight then prompt.RequiresLineOfSight = false end
-                
+            -- CHỈ TỰ ĐỘNG SỬA KHI LẠI GẦN (Dưới 12 studs cho chính xác)
+            if distance <= 12 then
                 if not repairStarted then
-                    print("[🖱️] Đã đến gần Power Box! Tự động kích hoạt sửa máy...")
+                    print("[🖱️] Đã đứng cạnh hộp điện! Đang kích hoạt tương tác...")
                     repairStarted = true
                     startTime = os.clock()
                     
-                    -- Kích hoạt giữ nút một cách tự nhiên theo cơ chế của Roblox Engine
-                    -- Không dùng vòng lặp spam tránh kích hoạt nhầm bảng mua Robux
+                    -- Thực hiện tương tác an toàn tùy thuộc vào Executor của bạn hỗ trợ gì
                     task.spawn(function()
-                        if fireproximityprompt then
-                            fireproximityprompt(prompt)
-                        else
-                            prompt:InputHoldBegin()
+                        while repairStarted and promptPart and promptPart.Parent do
+                            -- Cách 1: Nếu game có ClickDetector ẩn trong đó
+                            local cd = promptPart:FindFirstChildOfClass("ClickDetector") or promptPart.Parent:FindFirstChildOfClass("ClickDetector")
+                            if cd then
+                                fireclickdetector(cd)
+                            -- Cách 2: Nếu game dùng ProximityPrompt thật nằm trong Part này
+                            elseif promptPart:FindFirstChildOfClass("ProximityPrompt") then
+                                fireproximityprompt(promptPart:FindFirstChildOfClass("ProximityPrompt"))
+                            else
+                                -- Cách 3: Giả lập click chuột trực tiếp vào Part (Giải pháp tối ưu cho Custom Prompt)
+                                if firetouchinterest then
+                                    -- Đôi khi game check Touch (chạm chân vào)
+                                    firetouchinterest(root, promptPart, 0)
+                                    task.wait()
+                                    firetouchinterest(root, promptPart, 1)
+                                end
+                            end
+                            task.wait(0.2) -- Giảm tần suất xuống 0.2s để không bao giờ bị spam nhảy bảng Robux
                         end
                     end)
                 end
                 
-                -- KIỂM TRA THỜI GIAN HOÀN THÀNH (16 giây)
+                -- ĐẾM ĐỦ 16 GIÂY -> HOÀN THÀNH STAGE
                 if repairStarted and (os.clock() - startTime) >= 16 then
-                    print("[🎯 STAGE 4 SUCCESS] Đã sửa máy đủ thời gian quy định!")
+                    print("[🎯 STAGE 4 SUCCESS] Đã sửa máy hoàn tất!")
                     stage4Connection:Disconnect()
                 end
             else
-                -- Nếu người chơi chạy ra quá xa khi chưa sửa xong thì reset trạng thái để sẵn sàng cho lần lại gần tiếp theo
+                -- Nếu chạy ra xa thì dừng sửa (Tránh bug)
                 if repairStarted then
-                    print("[⚠️] Quá xa mục tiêu, tạm dừng tiến trình sửa.")
+                    print("[⚠️] Bạn đã rời xa hộp điện, tạm dừng tiến trình.")
                     repairStarted = false
-                    pcall(function() prompt:InputHoldEnd() end)
                 end
             end
         else
-            -- Nếu nút biến mất (đã sửa xong hoặc biến mất khỏi map)
+            -- Nếu sửa xong và Model/Part biến mất khỏi Map
             if repairStarted then
-                print("[🎯 STAGE 4 SUCCESS] Nút đã biến mất. Sửa máy thành công!")
+                print("[🎯 STAGE 4 SUCCESS] Máy phát điện đã biến mất. Thành công!")
                 stage4Connection:Disconnect()
             end
         end
     end
 end)
 
--- Treo luồng script Stage 4 tạm thời cho đến khi Connection phía trên tự hủy hoàn toàn
+-- Đợi luồng chạy ngầm của Stage 4 kết thúc hoàn toàn
 while stage4Connection and stage4Connection.Connected do task.wait() end
 
--- DỌN DẸP SẠCH SẼ BỘ NHỚ LẬP TỨC
+-- DỌN DẸP SẠCH SẼ
 repairStarted = false
-local finalPrompt = getPowerBoxPrompt()
-if finalPrompt then pcall(function() finalPrompt:InputHoldEnd() end) end
 
--- CHUYỂN GIAO THẦN TỐC SANG STAGE 5
-print("[🚀] Stage 4 hoàn thành sạch sẽ. Kích hoạt chuyển giao sang Stage 5...");
+-- CHUYỂN GIAO SANG STAGE 5
+print("[🚀] Stage 4 hoàn thành gọn gàng. Tiến lên Stage 5...");
 _G.CurrentStage = 5
 return true
