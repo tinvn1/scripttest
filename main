@@ -7,7 +7,7 @@ end
 local startTimeGlobal = os.clock()
 local isForcedRejoining = false -- Biến trạng thái chặn chạy tiếp khi đang Rejoin
 
-print("[⚡ SYSTEM] Khởi động Main Loader Update Mới Nhất - Đồng bộ Stage 0 & Chống lỗi dây chuyền!");
+print("[⚡ SYSTEM] Khởi động Main Loader - Đã tách biệt Stage 0 chạy loadstring từ xa!");
 
 local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
@@ -79,150 +79,11 @@ local function runFile(fileName)
 end
 
 -- =========================================================================
--- 🛡️ STAGE 0: LUỒNG ZHUB SÂU TUẦN TỰ CHỐNG NUỐT NÚT (ĐỒNG BỘ CHUẨN)
+-- 🛡️ CHẠY STAGE 0 HOÀN HẢO RIÊNG BIỆT QUA LOADSTRING TỪ GITHUB
 -- =========================================================================
 task.spawn(function()
-    print("[🚀 STAGE 0] Đang tải Menu ZHUB phụ trợ từ Github...")
-
-    -- 1. Tải ZHUB (Bọc pcall để cách ly hoàn toàn lỗi framework Knit ngoại lai)
-    local successLoad, errLoad = pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Notzephyr/UIX/refs/heads/main/Zombie.lua"))()
-    end)
-
-    if not successLoad then
-        warn("[⚠️ STAGE 0] Không thể tải ZHUB từ Github: " .. tostring(errLoad))
-    end
-
-    -- Đợi một khoảng ngắn ban đầu để menu kịp tạo dữ liệu nền
-    task.wait(4)
-
-    -- 2. Đợi giao diện Menu xuất hiện trong CoreGui hoặc PlayerGui
-    local Players = game:GetService("Players")
-    local player = Players.LocalPlayer
-    local CoreGui = game:GetService("CoreGui")
-    local targetGui = nil
-
-    for i = 1, 30 do
-        targetGui = CoreGui:FindFirstChild("ZHUB") 
-                    or player.PlayerGui:FindFirstChild("ZHUB") 
-                    or CoreGui:FindFirstChildOfClass("ScreenGui") 
-                    or player.PlayerGui:FindFirstChildOfClass("ScreenGui")
-        if targetGui and targetGui:FindFirstChildOfClass("Frame") then break end
-        task.wait(0.5)
-    end
-
-    if not targetGui then
-        targetGui = CoreGui -- Phương án dự phòng cuối: Quét thẳng từ gốc CoreGui nếu không định vị được thẻ cha
-    end
-
-    -- Hàm giả lập click chuột chuẩn bọc lót getconnections sâu
-    local function fireClickEvents(toggleBtn)
-        if not toggleBtn then return end
-        local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
-        for _, event in ipairs(events) do
-            if toggleBtn[event] then
-                pcall(function()
-                    if getconnections then
-                        local fired = false
-                        for _, connection in pairs(getconnections(toggleBtn[event])) do
-                            connection:Fire()
-                            fired = true
-                        end
-                        if not fired then toggleBtn[event]:Fire() end
-                    else
-                        toggleBtn[event]:Fire()
-                    end
-                end)
-            end
-        end
-    end
-
-    -- 3. Thực hiện quét cấu hình và ép kích hoạt tuần tự độc lập từng nút
-    local configSuccess = pcall(function()
-        
-        -------------------------------------------------------------------------
-        -- 🚚 BƯỚC 1: ƯU TIÊN PHÁT HIỆN VÀ ÉP BẬT "AUTO DRAG" TRƯỚC
-        -------------------------------------------------------------------------
-        print("[⏳ ZHUB] Đang tiến hành tìm và ép bật: Auto Drag...");
-        local dragSuccess = false
-        
-        for attempt = 1, 20 do
-            if dragSuccess then break end
-            
-            -- Thử kích hoạt bằng Flags hệ thống (Cách tối ưu)
-            if getgenv().Flags then
-                pcall(function()
-                    if getgenv().Flags["Auto Drag"] then getgenv().Flags["Auto Drag"]:Set(true) dragSuccess = true end
-                    if getgenv().Flags["AutoDrag"] then getgenv().Flags["AutoDrag"]:Set(true) dragSuccess = true end
-                end)
-            end
-            
-            -- Phương án quét vật lý tìm TextLabel nếu Flag thất bại
-            if not dragSuccess then
-                for _, v in pairs(targetGui:GetDescendants()) do
-                    if v:IsA("TextLabel") and (v.Text == "Auto Drag" or string.find(v.Text, "Auto Drag")) then
-                        local p = v.Parent
-                        if p then
-                            local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton") or p.Parent:FindFirstChildOfClass("TextButton")
-                            if toggleBtn then
-                                fireClickEvents(toggleBtn)
-                                dragSuccess = true
-                                print("[✔️ SUCCESS] Đã ép bật Auto Drag thành công bằng cách quét UI!");
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-            task.wait(0.5) -- Giãn cách quét tránh tràn bộ nhớ
-        end
-
-        -- 🕒 ĐỘ TRỄ QUYẾT ĐỊNH: Nghỉ hẳn 1.5 giây sau khi xong Auto Drag để xả nghẽn hàng đợi lệnh!
-        print("[⏳ SYSTEM] Nghỉ 1.5 giây để ổn định giao diện trước khi bật nút tiếp theo...");
-        task.wait(1.5)
-
-        -------------------------------------------------------------------------
-        -- ⚔️ BƯỚC 2: TIẾN HÀNH PHÁT HIỆN VÀ ÉP BẬT "KILL AURA"
-        -------------------------------------------------------------------------
-        print("[⏳ ZHUB] Đang tiến hành tìm và ép bật: Kill Aura...");
-        local auraSuccess = false
-        
-        for attempt = 1, 20 do
-            if auraSuccess then break end
-            
-            -- Thử kích hoạt bằng Flags hệ thống
-            if getgenv().Flags then
-                pcall(function()
-                    if getgenv().Flags["Kill Aura"] then getgenv().Flags["Kill Aura"]:Set(true) auraSuccess = true end
-                    if getgenv().Flags["KillAura"] then getgenv().Flags["KillAura"]:Set(true) auraSuccess = true end
-                end)
-            end
-            
-            -- Phương án quét vật lý tìm TextLabel của Kill Aura
-            if not auraSuccess then
-                for _, v in pairs(targetGui:GetDescendants()) do
-                    if v:IsA("TextLabel") and (v.Text == "Kill Aura" or string.find(v.Text, "Kill Aura")) then
-                        local p = v.Parent
-                        if p then
-                            local toggleBtn = p:FindFirstChildOfClass("TextButton") or p:FindFirstChildOfClass("ImageButton") or p.Parent:FindFirstChildOfClass("TextButton")
-                            if toggleBtn then
-                                fireClickEvents(toggleBtn)
-                                auraSuccess = true
-                                print("[✔️ SUCCESS] Đã ép bật Kill Aura thành công bằng cách quét UI!");
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-            task.wait(0.5)
-        end
-        
-    end)
-
-    if not configSuccess then
-        warn("[⚠️ STAGE 0] Luồng ZHUB cấu hình gặp lỗi, tự động cô lập để chuyển Stage 1.")
-    end
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("Stage0_ZHUB.lua") 
 end)
 
 -- =========================================================================
