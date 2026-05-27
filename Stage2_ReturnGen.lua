@@ -2,10 +2,16 @@ local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
 local TweenService = game:GetService("TweenService")
 local localPlayer = game:GetService("Players").LocalPlayer
-local TWEEN_SPEED = 30
+local TWEEN_SPEED = 32
+
+local path = PathfindingService:CreatePath({
+    AgentRadius = 1.6, 
+    AgentHeight = 5, 
+    AgentCanJump = true
+})
 
 -- =========================================================================
--- 🔥 HÀM ĐỊNH VỊ MÁY PHÁT ĐIỆN (GENERATOR)
+-- 🛠️ HÀM ĐỊNH VỊ MÁY PHÁT ĐIỆN (GENERATOR)
 -- =========================================================================
 local function getGenerator()
     for _, obj in pairs(Workspace:GetDescendants()) do
@@ -17,17 +23,15 @@ local function getGenerator()
 end
 
 -- =========================================================================
--- 🔥 HÀM CHECK ATTRIBUTE "STAGE" (SPY CHECK XEM MÁY LÊN CẤP 2 CHƯA)
+-- 🕵️‍♂️ HÀM KIỂM TRA THUỘC TÍNH SERVER (SPY CHECK)
 -- =========================================================================
 local function checkIsStage2(genPart)
     if not genPart then return false end
-    
-    -- Lấy Model gốc để đọc Attribute từ dữ liệu ngầm của Server
     local genModel = genPart:IsA("Model") and genPart or genPart.Parent
     if genModel then
         local currentStage = genModel:GetAttribute("Stage")
         if currentStage then
-            print("[🕵️ SPY CHECK] Thuộc tính máy phát điện hiện tại: " .. tostring(currentStage))
+            print("[🕵️ SPY CHECK] Máy phát điện thực tế từ Server đang ở Cấp: " .. tostring(currentStage))
             if tonumber(currentStage) >= 2 then
                 return true
             end
@@ -37,64 +41,100 @@ local function checkIsStage2(genPart)
 end
 
 -- =========================================================================
--- ⚡ LUỒNG XỬ LÝ CHÍNH CỦA STAGE 2
+-- 🏃‍♂️ HÀM DI CHUYỂN DÒ ĐƯỜNG TIẾP CẬN MÁY PHÁT ĐIỆN
 -- =========================================================================
-print("[⏳ STAGE 2] Tiếp cận máy phát điện để nạp Fuel...")
+local function walkPathToGenerator(root, genPart)
+    if not root or not genPart then return false end
+    
+    local success, err = pcall(function()
+        path:ComputeAsync(root.Position, genPart.Position)
+    end)
+    if not success or path.Status ~= Enum.PathStatus.Success then return false end
+    
+    local waypoints = path:GetWaypoints()
+    for i = 1, math.min(#waypoints, 5) do
+        local wp = waypoints[i]
+        local dist = (root.Position - wp.Position).Magnitude
+        local duration = dist / TWEEN_SPEED
+        local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+            CFrame = CFrame.new(wp.Position + Vector3.new(0, 1, 0)) -- Hạ thấp trọng tâm lướt sát sàn
+        })
+        tween:Play()
+        tween.Completed:Wait()
+    end
+    
+    -- ÉP LỰC CUỐI: Lao thẳng vào tâm máy phát điện
+    local finalDist = (root.Position - genPart.Position).Magnitude
+    if finalDist < 15 then
+        local finalTween = TweenService:Create(root, TweenInfo.new(finalDist / TWEEN_SPEED, Enum.EasingStyle.Linear), {
+            CFrame = CFrame.new(genPart.Position + Vector3.new(0, 0.5, 0))
+        })
+        finalTween:Play()
+        finalTween.Completed:Wait()
+    end
+    
+    return true
+end
+
+-- =========================================================================
+-- TIẾN TRÌNH THỰC THI CHÍNH CỦA STAGE 2
+-- =========================================================================
+print("[🎒 STAGE 2] Bắt đầu luồng tiếp cận Generator...");
 
 local char = localPlayer.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
 local genPart = getGenerator()
 
-if not root or not genPart then
-    warn("[❌ STAGE 2 ERROR] Thất bại mục tiêu! Quay lại Stage 1.")
-    _G.CurrentStage = 1
-    return false
-end
-
--- 1. 🏃‍♂️ TWEEN DI CHUYỂN MƯỢT ĐẾN MÁY PHÁT ĐIỆN
-local dist = (root.Position - genPart.Position).Magnitude
-local duration = dist / TWEEN_SPEED
-local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(genPart.Position + Vector3.new(0, 2, 0))})
-
-tween:Play()
-tween.Completed:Wait()
-task.wait(0.2)
-
--- 2. 🎒 KÍCH HOẠT CẤT FUEL (ĐỔ XĂNG)
-print("[🎒] Đang thực hiện tương tác đổ nhiên liệu...")
-local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
-if prompt and fireproximityprompt then
-    fireproximityprompt(prompt)
-else
-    root.CFrame = CFrame.new(genPart.Position) -- Ép chạm vật lý dự phòng
-end
-
-print("[⏳] Đợi 1.5 giây để Server xử lý và cập nhật dữ liệu...")
-task.wait(1.5)
-
--- 3. 🕵️‍♂️ BỘ LỌC SPY CHECK ĐA TẦNG CHỐNG LAG PING SERVER
-local isRealStage2 = false
-
--- Quét 3 lần liên tục (mỗi lần cách nhau 0.5s) để chống lỗi delay dữ liệu từ máy chủ
-for attempt = 1, 3 do
-    if checkIsStage2(genPart) then
-        isRealStage2 = true
-        break
+if root and genPart and _G.CurrentStage == 2 then
+    -- Thực hiện di chuyển sát vào Generator
+    walkPathToGenerator(root, genPart)
+    task.wait(0.1) -- Đợi vật lý nhân vật ổn định vị trí
+    
+    -- 🔥 BỘ KIỂM TOÁN KHOẢNG CÁCH THỰC TẾ (CHỐNG ĐỔ XĂNG HỤT)
+    local checkDist = (root.Position - genPart.Position).Magnitude
+    if checkDist <= 5 then
+        print(string.format("[🎉 TIẾP CẬN] Đã đứng sát sạt Máy phát điện (Khoảng cách: %.2f studs). Tiến hành đổ xăng!", checkDist))
+        
+        -- Kích hoạt đổ xăng
+        local prompt = genPart:FindFirstChildOfClass("ProximityPrompt") 
+                       or genPart.Parent:FindFirstChildOfClass("ProximityPrompt")
+                       or (genPart.Parent:IsA("Model") and genPart.Parent:FindFirstChildWhichIsA("ProximityPrompt"))
+        
+        if prompt and fireproximityprompt then
+            fireproximityprompt(prompt)
+        else
+            -- Dự phòng nếu không tìm thấy Prompt: Ép CFrame dẫm thẳng vào để Touch vật lý nạp nhiên liệu
+            root.CFrame = CFrame.new(genPart.Position)
+        end
+        
+        print("[⏳] Đợi 1.5 giây để Server cập nhật trạng thái hoạt ảnh...")
+        task.wait(1.5)
+        
+        -- Spy Check 3 lần chống lag ping cao từ Server
+        local isRealStage2 = false
+        for attempt = 1, 3 do
+            if checkIsStage2(genPart) then 
+                isRealStage2 = true
+                break 
+            end
+            task.wait(0.5)
+        end
+        
+        if isRealStage2 then
+            print("[🎯 STAGE 2 SUCCESS] Xác nhận nâng cấp lên cấp 2 hoàn tất! Chuyển giao sang Stage 3.")
+            _G.CurrentStage = 3
+        else
+            warn("[❌ STAGE 2 LỖI] Đã nạp nhưng máy không lên cấp (có thể hụt bình xăng hoặc server lag)! Ép về Stage 1 để kiểm tra.")
+            _G.CurrentStage = 1
+        end
+    else
+        -- ❌ PHÁT HIỆN LỖI: Chưa tới nơi mà hàm di chuyển đã dừng (Kẹt góc, ôm tường)
+        warn(string.format("[❌ TIẾP CẬN LỖI] Đứng quá xa Máy phát điện (Khoảng cách: %.2f studs)! Ép về Stage 1 đi nhặt lại để làm mới luồng.", checkDist))
+        _G.CurrentStage = 1
     end
-    print(string.format("[⚠️ ATTEMPT %d] Chưa nhận thông báo cấp 2 từ Spy, đợi tiếp...", attempt))
-    task.wait(0.5)
+else
+    warn("[⚠️ STAGE 2 ABORT] Không tìm thấy Generator hoặc nhân vật chưa sẵn sàng. Trở lại Stage 1.")
+    _G.CurrentStage = 1
 end
 
--- 4. 🔀 ĐIỀU HƯỚNG THÔNG MINH THEO KẾT QUẢ SPY CHECK
-if isRealStage2 then
-    print("[🎯 STAGE 2 SUCCESS] Spy xác nhận: Máy phát điện ĐÃ LÊN CẤP 2! Chuyển tiếp Stage 3.")
-    task.wait(0.2)
-    _G.CurrentStage = 3 -- Chạy tiếp sang Stage 3
-    return true
-else
-    warn("[❌ STAGE 2 FAILED] Máy vẫn Cấp 1! Thiếu nhiên liệu. Quay lại Stage 1...")
-    task.wait(0.2)
-    _G.CurrentStage = 1 -- Quay lại Stage 1 tìm thêm xăng
-    return false
-end
+return true
