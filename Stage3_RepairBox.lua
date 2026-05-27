@@ -125,7 +125,23 @@ end
 -- =========================================================================
 -- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3
 -- =========================================================================
-print("[STAGE 3] Bắt đầu luồng chạy bộ mượt mà (Đã sửa lỗi Unicode)...")
+print("[STAGE 3] Bắt đầu luồng chạy bộ mượt mà...")
+
+-----------------------------------------------------------------------
+-- 🛠️ ĐOẠN THÊM VÀO: ÉP TẮT AUTO DRAG CỦA ZHUB KHI VÀO STAGE 3
+-----------------------------------------------------------------------
+if getgenv().Flags then
+    if getgenv().Flags["Auto Drag Body"] ~= nil then
+        getgenv().Flags["Auto Drag Body"]:Set(false)
+        print("[❌ STAGE 3 BIỆN PHÁP] Đã ép tắt: Auto Drag Body")
+    end
+    if getgenv().Flags["Auto Drag"] ~= nil then
+        getgenv().Flags["Auto Drag"]:Set(false)
+        print("[❌ STAGE 3 BIỆN PHÁP] Đã ép tắt: Auto Drag")
+    end
+end
+-----------------------------------------------------------------------
+
 local reached = false
 
 while not reached do
