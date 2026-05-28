@@ -1,0 +1,42 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- CẤU HÌNH CAMERA
+local CAMERA_DISTANCE = 10 -- Khoảng cách từ camera đến nhân vật
+local CAMERA_HEIGHT = 3.5    -- Chiều cao của camera so với nhân vật
+local SMOOTH_SPEED = 0.1   -- Tốc độ mượt mà khi camera đuổi theo (0.1 là vừa đẹp)
+
+-- Đặt chế độ camera thành Scriptable để tự điều khiển bằng code
+camera.CameraType = Enum.CameraType.Scriptable
+
+RunService.RenderStepped:Connect(function()
+	local character = player.Character
+	if not character then return end
+	
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	
+	if rootPart and humanoid and humanoid.Health > 0 then
+		camera.CameraType = Enum.CameraType.Scriptable
+		
+		-- Lấy vị trí và hướng nhìn hiện tại của nhân vật
+		local rootPos = rootPart.Position
+		local rootLookVector = rootPart.CFrame.LookVector
+		
+		-- Tính toán vị trí lý tưởng ở PHÍA SAU LƯNG nhân vật
+		-- (Trừ đi LookVector để lùi về sau, cộng thêm Height để nâng cao lên)
+		local targetPos = rootPos - (rootLookVector * CAMERA_DISTANCE) + Vector3.new(0, CAMERA_HEIGHT, 0)
+		
+		-- Sử dụng Vector3:Lerp để camera di chuyển mượt mà tới vị trí mục tiêu
+		local smoothedPos = camera.CFrame.Position:Lerp(targetPos, SMOOTH_SPEED)
+		
+		-- Cập nhật CFrame của camera: Đứng ở vị trí mượt mà và luôn NHÌN VÀO nhân vật
+		camera.CFrame = CFrame.new(smoothedPos, rootPos + Vector3.new(0, 1.5, 0))
+	else
+		-- Nếu nhân vật chưa load xong hoặc chết, trả về camera mặc định của game
+		camera.CameraType = Enum.CameraType.Custom
+	end
+end)
