@@ -5,7 +5,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local localPlayer = Players.LocalPlayer
 
-print("[🛠️ STAGE 4] Kích hoạt luồng Sửa Máy Phát thế hệ mới - Chống chặn tương tác...");
+print("[🛠️ STAGE 4] Kích hoạt luồng Sửa Máy Phát thế hệ mới - Đã FIX LỖI MOBILE...");
 task.wait(0.5) 
 
 -- =========================================================================
@@ -45,20 +45,29 @@ print("[🖱️ TARGET LOCKED] Đã khóa tọa độ máy phát điện!")
 
 local repairStarted = true
 local startTime = os.clock()
-local targetPosition = promptPart.Position + Vector3.new(0, 0, 1.2) -- Đứng cách máy 1.2 studs cực kỳ tự nhiên
+-- Đứng sát phía trên mục tiêu một chút để đảm bảo khoảng cách tương tác luôn chuẩn xác
+local targetPosition = promptPart.Position + Vector3.new(0, 1.2, 0) 
 
 -- =========================================================================
--- 🔥 LUỒNG TƯƠNG TÁC ỔN ĐỊNH CHỐNG CHẶN (ANTI-PATCH)
+-- 🔥 LUỒNG TƯƠNG TÁC ỔN ĐỊNH CHO CẢ PC VÀ MOBILE (ANTI-PATCH)
 -- =========================================================================
 task.spawn(function()
+    -- Cố định vị trí nhân vật ngay lập tức bằng CFrame để tránh bị MoveTo làm khựng hành động
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.lookAt(targetPosition, promptPart.Position)
+        task.wait(0.1)
+    end
+
     -- Gửi lệnh đè phím E ban đầu (Dành cho PC)
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
     end)
 
     while repairStarted do
-        local char = localPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
+        char = localPlayer.Character
+        root = char and char:FindFirstChild("HumanoidRootPart")
         local humanoid = char and char:FindFirstChildOfClass("Humanoid")
         
         if not promptPart or not promptPart.Parent then 
@@ -66,44 +75,41 @@ task.spawn(function()
         end
         
         if root and humanoid and humanoid.Health > 0 then
-            -- THAY THẾ KHÓA CỨNG: Di chuyển liên tục về hướng máy phát điện và quay mặt vào máy
-            humanoid:MoveTo(targetPosition)
-            root.CFrame = CFrame.lookAt(root.Position, promptPart.Position)
-            root.AssemblyLinearVelocity = Vector3.zero -- Triệt tiêu lực đẩy để không bị lệch tâm
+            -- Giữ CFrame quay mặt vào máy mà không dùng MoveTo gây kẹt phím trên Mobile
+            root.CFrame = CFrame.lookAt(targetPosition, promptPart.Position)
+            root.AssemblyLinearVelocity = Vector3.zero 
             
             local prompt = promptPart:FindFirstChildWhichIsA("ProximityPrompt") 
                 or promptPart.Parent:FindFirstChildWhichIsA("ProximityPrompt")
             
             if prompt then
-                -- PHƯƠNG ÁN CHUẨN: Giả lập nhấn đè thay vì spam liên tục để tránh Server từ chối lệnh
+                -- Gọi lệnh giữ phím hệ thống
                 pcall(function()
                     prompt:InputHoldBegin()
                 end)
                 
+                -- Kích nổ tín hiệu Prompt (Bypass Mobile cực mạnh)
                 if fireproximityprompt then
                     fireproximityprompt(prompt)
                 end
                 
-                -- Tạo độ trễ mạng tự nhiên cho Mobile
                 pcall(function()
                     ProximityPromptService:NotifyPromptTriggered(prompt)
                 end)
             end
             
-            -- Chạm vật lý an toàn
+            -- Chạm vật lý an toàn chống Check-Distance từ Server
             if firetouchinterest then
                 firetouchinterest(root, promptPart, 0)
                 task.wait(0.02)
                 firetouchinterest(root, promptPart, 1)
             end
         else
-            -- Đợi hồi sinh nếu bị quái đánh chết và tiếp tục kéo về máy sửa tiếp
             task.wait(0.5)
         end
         
-        -- GIẢM TẦN SUẤT QUÉT: Thay vì chạy theo khung hình (Heartbeat), đổi sang 0.25 giây/lần
-        -- Việc này giúp bypass hoàn toàn bộ lọc Spam tương tác của chống hack
-        task.wait(0.25) 
+        -- Nhịp chờ 0.2 giây vừa đủ nhanh để nạp tiến trình nhưng không làm quá tải băng thông
+        task.wait(0.2) 
     end
 
     -- GIẢI PHÓNG TOÀN BỘ PHÍM KHI XONG VIỆC
@@ -120,7 +126,7 @@ end)
 -- =========================================================================
 -- VÒNG LẶP KIỂM TRA ĐỒNG BỘ THƯỞNG
 -- =========================================================================
-local maxWaitTime = 18 -- Tăng nhẹ thời gian bảo hiểm sửa máy lên 18 giây do có delay chống chặn
+local maxWaitTime = 18 
 local bonusDelay = 1.5 
 local promptDisappeared = false
 
