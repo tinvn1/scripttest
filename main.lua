@@ -85,7 +85,10 @@ task.spawn(function()
     -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
     runFile("Stage0_ZHUB.lua") 
 end)
-
+task.spawn(function()
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("join map") 
+end)
 -- =========================================================================
 -- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
 -- =========================================================================
