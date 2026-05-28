@@ -1,4 +1,4 @@
- -- Chờ trò chơi tải xong xuôi
+-- Chờ trò chơi tải xong xuôi
 if not game:IsLoaded() then
     game.Loaded:Wait()
 end
@@ -90,17 +90,16 @@ end)
 -- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
 -- =========================================================================
 task.spawn(function()
-    runFile("join map")
-end)
-task.spawn(function()
     runFile("AutoEquip.lua")
 end)
+
 -- =========================================================================
 -- 🔄 HỆ THỐNG VẬN HÀNH TUẦN TỰ QUA CÁC STAGE GỐC (CHỐNG LỖI LOGIC)
 -- =========================================================================
 runFile("Stage1_GetFuel.lua")   
 runFile("Stage2_ReturnGen.lua") 
 runFile("Stage3_RepairBox.lua") 
+
 -- =========================================================================
 -- 🛠️ STAGE 4 VÀ STAGE 5 (XỬ LÝ CUỐI TRẬN ĐỒNG BỘ CHUẨN)
 -- =========================================================================
