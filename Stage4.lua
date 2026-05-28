@@ -5,7 +5,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local localPlayer = Players.LocalPlayer
 
-print("[🛠️ STAGE 4] Khởi chạy luồng Sửa Máy Phát Đa Nền Tảng (PC & Mobile)...");
+print("[🛠️ STAGE 4] Kích hoạt luồng Sửa Máy Phát thế hệ mới - Chống chặn tương tác...");
 task.wait(0.5) 
 
 -- =========================================================================
@@ -28,7 +28,7 @@ end
 local promptPart = nil
 local startTimeScan = os.clock()
 
--- Vòng lặp quét mục tiêu dứt khoát
+-- Vòng lặp quét mục tiêu dứt khoát ban đầu
 while not promptPart do
     promptPart = getPowerBoxPromptPart()
     if not promptPart then
@@ -41,79 +41,76 @@ while not promptPart do
     end
 end
 
-print("[🖱️ TARGET LOCKED] Đã khóa tọa độ máy phát điện thành công!")
+print("[🖱️ TARGET LOCKED] Đã khóa tọa độ máy phát điện!")
 
 local repairStarted = true
 local startTime = os.clock()
-local targetPosition = promptPart.Position + Vector3.new(0, 0.5, 1) -- Vị trí đứng tối ưu sát cạnh máy
+local targetPosition = promptPart.Position + Vector3.new(0, 0, 1.2) -- Đứng cách máy 1.2 studs cực kỳ tự nhiên
 
 -- =========================================================================
--- 🔥 LUỒNG TƯƠNG TÁC LIÊN TỤC CHỐNG RỜI MÁY (PC & MOBILE CO-EXIST)
+-- 🔥 LUỒNG TƯƠNG TÁC ỔN ĐỊNH CHỐNG CHẶN (ANTI-PATCH)
 -- =========================================================================
 task.spawn(function()
+    -- Gửi lệnh đè phím E ban đầu (Dành cho PC)
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    end)
+
     while repairStarted do
         local char = localPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local humanoid = char and char:FindFirstChildOfClass("Humanoid")
         
-        -- Nếu prompt bị mất (ai đó phá hoặc đã sửa xong), tự động dừng luồng
         if not promptPart or not promptPart.Parent then 
             break 
         end
         
         if root and humanoid and humanoid.Health > 0 then
-            -- [GIỮ VỊ TRÍ] Ép nhân vật bám chặt vào máy phát điện, chống bị quái đẩy văng ra ngoài
-            root.CFrame = CFrame.new(targetPosition, promptPart.Position)
-            root.AssemblyLinearVelocity = Vector3.zero -- Triệt tiêu lực đẩy vật lý bên ngoài
+            -- THAY THẾ KHÓA CỨNG: Di chuyển liên tục về hướng máy phát điện và quay mặt vào máy
+            humanoid:MoveTo(targetPosition)
+            root.CFrame = CFrame.lookAt(root.Position, promptPart.Position)
+            root.AssemblyLinearVelocity = Vector3.zero -- Triệt tiêu lực đẩy để không bị lệch tâm
             
-            -- Lấy Object ProximityPrompt thực tế của game
             local prompt = promptPart:FindFirstChildWhichIsA("ProximityPrompt") 
                 or promptPart.Parent:FindFirstChildWhichIsA("ProximityPrompt")
             
             if prompt then
-                -- PHƯƠNG ÁN 1: Kích hoạt API Thô (Dành cho PC/Exploit hỗ trợ)
+                -- PHƯƠNG ÁN CHUẨN: Giả lập nhấn đè thay vì spam liên tục để tránh Server từ chối lệnh
+                pcall(function()
+                    prompt:InputHoldBegin()
+                end)
+                
                 if fireproximityprompt then
                     fireproximityprompt(prompt)
                 end
                 
-                -- PHƯƠNG ÁN 2: Ép trạng thái Input trên Điện thoại (Bypass Mobile cực mạnh)
+                -- Tạo độ trễ mạng tự nhiên cho Mobile
                 pcall(function()
-                    prompt:InputHoldBegin()
-                    -- Giả lập giữ tương tác mạng trực tiếp lên Server của Roblox
                     ProximityPromptService:NotifyPromptTriggered(prompt)
                 end)
             end
             
-            -- Hỗ trợ thêm ClickDetector nếu cấu hình map thay đổi
-            local cd = promptPart:FindFirstChildWhichIsA("ClickDetector") or promptPart.Parent:FindFirstChildWhichIsA("ClickDetector")
-            if cd and fireclickdetector then
-                fireclickdetector(cd)
-            end
-            
-            -- Giả lập chạm vật lý liên tục (Touch Interest)
+            -- Chạm vật lý an toàn
             if firetouchinterest then
                 firetouchinterest(root, promptPart, 0)
-                task.wait()
+                task.wait(0.02)
                 firetouchinterest(root, promptPart, 1)
             end
-
-            -- PHƯƠNG ÁN 3: Giả lập đè phím E vật lý (Dành riêng cho máy tính PC)
-            pcall(function()
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            end)
         else
-            -- BẢO HIỂM HỒI SINH: Nếu chết, chờ nhân vật xuất hiện lại rồi kéo ngược về máy ngay lập tức
-            task.wait(0.2)
+            -- Đợi hồi sinh nếu bị quái đánh chết và tiếp tục kéo về máy sửa tiếp
+            task.wait(0.5)
         end
-        RunService.Heartbeat:Wait()
+        
+        -- GIẢM TẦN SUẤT QUÉT: Thay vì chạy theo khung hình (Heartbeat), đổi sang 0.25 giây/lần
+        -- Việc này giúp bypass hoàn toàn bộ lọc Spam tương tác của chống hack
+        task.wait(0.25) 
     end
 
-    -- GIẢI PHÓNG PHÍM: Nhả toàn bộ lệnh tương tác khi hoàn tất để tránh lỗi kẹt nhân vật
+    -- GIẢI PHÓNG TOÀN BỘ PHÍM KHI XONG VIỆC
     pcall(function()
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
     end)
     
-    local char = localPlayer.Character
     local prompt = promptPart and (promptPart:FindFirstChildWhichIsA("ProximityPrompt") or promptPart.Parent:FindFirstChildWhichIsA("ProximityPrompt"))
     if prompt then
         pcall(function() prompt:InputHoldEnd() end)
@@ -121,16 +118,16 @@ task.spawn(function()
 end)
 
 -- =========================================================================
--- LUỒNG BẢO HIỂM KIỂM TRA THỜI GIAN NHẬN KIM CƯƠNG
+-- VÒNG LẶP KIỂM TRA ĐỒNG BỘ THƯỞNG
 -- =========================================================================
-local maxWaitTime = 16 -- Thời gian giữ tối đa đề phòng lỗi map
+local maxWaitTime = 18 -- Tăng nhẹ thời gian bảo hiểm sửa máy lên 18 giây do có delay chống chặn
 local bonusDelay = 1.5 
 local promptDisappeared = false
 
 while (os.clock() - startTime) < maxWaitTime do
     if not promptPart or not promptPart.Parent then
         if not promptDisappeared then
-            print("[💎 MOBILE/PC INSURANCE] Máy phát điện đã biến mất! Chờ 1.5 giây Server đồng bộ phần thưởng...")
+            print("[💎 INSURANCE] Máy phát đã biến mất! Chờ Server trả kim cương...")
             promptDisappeared = true
             task.wait(bonusDelay)
             break
@@ -140,7 +137,7 @@ while (os.clock() - startTime) < maxWaitTime do
 end
 
 repairStarted = false
-print("[🎉 STAGE 4 SUCCESS] Đã hoàn thành sửa máy phát điện an toàn trên mọi thiết bị!");
+print("[🎉 STAGE 4 SUCCESS] Sửa máy phát điện hoàn tất!");
 
 task.wait(0.3)
 _G.CurrentStage = 5
