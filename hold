@@ -12,7 +12,7 @@ StarterGui:SetCore("SendNotification", {
 
 -- Lấy tọa độ chính giữa màn hình (Tự động cập nhật chuẩn cho cả PC và Điện thoại)
 local centerX = Camera.ViewportSize.X / 2
-local centerY = Camera.ViewportSize.Y / 2
+local centerY = Camera.ViewportSize.Y / 1
 
 task.spawn(function()
     -- [BƯỚC 1]: Nhấn chuột xuống tại tâm màn hình (Số 0 đại diện cho Chuột trái/Touch)
