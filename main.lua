@@ -90,19 +90,17 @@ end)
 -- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
 -- =========================================================================
 task.spawn(function()
-    runFile("AutoEquip.lua")
+    runFile("join map")
 end)
 task.spawn(function()
-    runFile("join map.lua")
+    runFile("AutoEquip.lua")
 end)
-
 -- =========================================================================
 -- 🔄 HỆ THỐNG VẬN HÀNH TUẦN TỰ QUA CÁC STAGE GỐC (CHỐNG LỖI LOGIC)
 -- =========================================================================
 runFile("Stage1_GetFuel.lua")   
 runFile("Stage2_ReturnGen.lua") 
 runFile("Stage3_RepairBox.lua") 
-
 -- =========================================================================
 -- 🛠️ STAGE 4 VÀ STAGE 5 (XỬ LÝ CUỐI TRẬN ĐỒNG BỘ CHUẨN)
 -- =========================================================================
@@ -205,5 +203,13 @@ local function runOptimizedStage5()
     end
 end
 
-runOptimizedStage4()
+-- 🔥 KÍCH HOẠT VÒNG LẶP STAGE 4 ĐÚNG 10 LẦN LIÊN TIẾP
+for i = 1, 10 do
+    if isForcedRejoining then break end
+    print("[🔄 STAGE 4] Đang chạy đợt sửa thứ: " .. i .. "/10")
+    runOptimizedStage4()
+    task.wait(0.2) -- Khoảng nghỉ rất ngắn (0.2s) để hệ thống kịp giải phóng phím bấm cũ trước khi chạy đợt mới
+end
+
+-- Sau khi hoàn thành xong 10 lần sửa, chuyển tiếp sang Stage 5 để Rejoin
 runOptimizedStage5()
