@@ -4,10 +4,9 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- CẤU HÌNH CAMERA
-local CAMERA_DISTANCE = 10 -- Khoảng cách từ camera đến nhân vật
+-- CẤU HÌNH CAMERA (Khóa góc nhìn song song)
+local CAMERA_DISTANCE = 10 -- Khoảng cách từ sau lưng đến nhân vật
 local CAMERA_HEIGHT = 3.5    -- Chiều cao của camera so với nhân vật
-local SMOOTH_SPEED = 0.1   -- Tốc độ mượt mà khi camera đuổi theo (0.1 là vừa đẹp)
 
 -- Đặt chế độ camera thành Scriptable để tự điều khiển bằng code
 camera.CameraType = Enum.CameraType.Scriptable
@@ -26,15 +25,12 @@ RunService.RenderStepped:Connect(function()
 		local rootPos = rootPart.Position
 		local rootLookVector = rootPart.CFrame.LookVector
 		
-		-- Tính toán vị trí lý tưởng ở PHÍA SAU LƯNG nhân vật
-		-- (Trừ đi LookVector để lùi về sau, cộng thêm Height để nâng cao lên)
+		-- TÍNH TOÁN VỊ TRÍ SONG SONG TUYỆT ĐỐI:
+		-- Ép vị trí camera dịch về sau lưng dựa trên góc xoay thực tế của nhân vật mà không dùng Lerp trễ
 		local targetPos = rootPos - (rootLookVector * CAMERA_DISTANCE) + Vector3.new(0, CAMERA_HEIGHT, 0)
 		
-		-- Sử dụng Vector3:Lerp để camera di chuyển mượt mà tới vị trí mục tiêu
-		local smoothedPos = camera.CFrame.Position:Lerp(targetPos, SMOOTH_SPEED)
-		
-		-- Cập nhật CFrame của camera: Đứng ở vị trí mượt mà và luôn NHÌN VÀO nhân vật
-		camera.CFrame = CFrame.new(smoothedPos, rootPos + Vector3.new(0, 1.5, 0))
+		-- Cập nhật CFrame trực tiếp giúp camera di chuyển đồng bộ, không bị khựng hay đuổi theo sau
+		camera.CFrame = CFrame.lookAt(targetPos, rootPos + Vector3.new(0, 1.5, 0))
 	else
 		-- Nếu nhân vật chưa load xong hoặc chết, trả về camera mặc định của game
 		camera.CameraType = Enum.CameraType.Custom
