@@ -16,26 +16,18 @@ local path = PathfindingService:CreatePath({
 -- =========================================================================
 -- 🔥 TÍNH NĂNG INF JUMP AN TOÀN (CHỐNG ANTI-CHEAT BAY)
 -- =========================================================================
--- Cơ chế này giả lập trạng thái "đang nhảy" liên tục thay vì tác động lực vật lý thô bạo
 local function triggerSafeInfJump(humanoid)
     if humanoid and humanoid.Health > 0 then
-        -- Thay đổi trạng thái Humanoid sang Jumping giúp nhân vật có thể nhảy tiếp khi đang ở trên không
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end
 
--- Tự động kích hoạt khi bạn tự tay bấm nút Space (Nhảy thủ công nếu muốn)
-local infJumpConnection
-if _G.InfJumpHooked then 
-    _G.InfJumpHooked:Disconnect() 
-end
-
+-- Tự động kích hoạt khi bấm nút Space thủ công
+if _G.InfJumpHooked then _G.InfJumpHooked:Disconnect() end
 _G.InfJumpHooked = UserInputService.JumpRequest:Connect(function()
     local char = localPlayer.Character
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-    end
+    if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
 end)
 
 -- =========================================================================
@@ -67,7 +59,7 @@ local function getNearestPowerBox(rootPosition)
 end
 
 -- =========================================================================
--- 🔥 HÀM DI CHUYỂN DỨT KHOÁT - NHẢY VƯỢT RÀO PHÁ KẸT THỜI GIAN THỰC
+-- 🔥 HÀM DI CHUYỂN CẢI TIẾN - THOÁT KẸT LÀ TÍNH LẠI ĐƯỜNG MỚI NGAY
 -- =========================================================================
 local function walkPathToTarget(rootPart, humanoid, targetPart)
     if not rootPart or not targetPart or not targetPart.Parent then return false end
@@ -91,7 +83,6 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
             
             humanoid.WalkSpeed = RUN_SPEED
             
-            -- Gặp điểm yêu cầu nhảy (vực/rào) -> Kích hoạt chuỗi nhảy dứt khoát
             if waypoint.Action == Enum.PathWaypointAction.Jump then 
                 triggerSafeInfJump(humanoid)
             end
@@ -115,26 +106,27 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
                 if (os.clock() - startTime) > 0.15 then
                     local movedDistance = (rootPart.Position - startPos).Magnitude
                     
-                    -- Nếu bị cấn góc rào hoặc mép tường không thể bước qua thông thường
+                    -- Nếu dậm chân tại chỗ quá 0.15s (bị cấn góc rào/tường)
                     if movedDistance < 1.2 then
                         local pushDirection = (waypoint.Position - rootPart.Position).Unit
                         
-                        -- SPAM INF JUMP ĐỂ VƯỢT RÀO: Đạp không khí 2-3 nhịp liên tục để leo qua vật cản
+                        -- Kích hoạt chuỗi nhảy phá kẹt dứt khoát
                         task.spawn(function()
                             for _ = 1, 3 do
                                 triggerSafeInfJump(humanoid)
-                                task.wait(0.08) -- Nhịp delay cực ngắn tránh bị server check lơ lửng
+                                task.wait(0.06)
                             end
                         end)
                         
-                        -- Thêm một lực đẩy ngang vừa phải hướng về phía trước (Giới hạn Y để không bị Anticheat sút)
-                        rootPart.AssemblyLinearVelocity = (pushDirection * (RUN_SPEED * 1.2)) + Vector3.new(0, 28, 0)
+                        -- Tăng nhẹ lực đẩy lên Y = 32 và kéo dài thời gian chờ thoát kẹt lên 0.15 giây
+                        rootPart.AssemblyLinearVelocity = (pushDirection * (RUN_SPEED * 1.3)) + Vector3.new(0, 32, 0)
                         
-                        humanoid:MoveTo(waypoint.Position + Vector3.new(math.random(-1, 1), 0, math.random(-1, 1)))
-                        task.wait(0.05)
+                        -- Đi chệch hướng ngẫu nhiên để lách góc cấn
+                        humanoid:MoveTo(waypoint.Position + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2)))
+                        task.wait(0.15) -- Chờ đủ thời gian để lực vật lý đẩy nhân vật ra khỏi góc kẹt
                         
                         isStuck = true 
-                        break 
+                        break -- Thoát khỏi vòng lặp kiểm tra khoảng cách waypoint
                     end
                     
                     startTime = os.clock()
@@ -144,14 +136,17 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
                 task.wait()
             end
             
-            if isStuck then break end
+            -- ĐIỂM SỬA LỖI MẤT CHỐT: Nếu kẹt, trả về false ngay lập tức để ép vòng lặp chính tính toán lại từ đầu
+            if isStuck then 
+                return false 
+            end
         end
         return true
     else
-        -- Phục hồi an toàn khi lỗi Path
+        -- Phục hồi khẩn cấp khi lỗi Path
         triggerSafeInfJump(humanoid)
         rootPart.AssemblyLinearVelocity = (-rootPart.CFrame.LookVector * 15) + Vector3.new(0, 20, 0)
-        task.wait(0.1)
+        task.wait(0.15)
         return false
     end
 end
@@ -159,7 +154,7 @@ end
 -- =========================================================================
 -- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3
 -- =========================================================================
-print("[STAGE 3] Đã tích hợp Inf Jump Bypass Chống Bay - Đang chạy bộ...")
+print("[STAGE 3] Khởi chạy luồng di chuyển thông minh - Tự động tái định vị khi kẹt...");
 local reached = false
 
 while not reached do
@@ -174,9 +169,10 @@ while not reached do
             local distance = (root.Position - targetBox.Position).Magnitude
             
             if distance > 4.5 then
+                -- Gọi hàm di chuyển, nếu hàm trả về false (do bị kẹt), vòng lặp while sẽ tự quét lại tọa độ và tính Path mới ở lượt sau
                 walkPathToTarget(root, humanoid, targetBox)
             else
-                print("[🎯 STAGE 3 SUCCESS] Đã vượt rào lao sát cạnh trạm điện!");
+                print("[🎯 STAGE 3 SUCCESS] Đã cập bến trạm điện dứt khoát!");
                 reached = true
             end
         else
