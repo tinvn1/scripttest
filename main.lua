@@ -106,6 +106,7 @@ end)
 runFile("Stage1_GetFuel.lua")   
 runFile("Stage2_ReturnGen.lua")
 runFile("checkjump.lua")
+runFile("checkfuel.lua")
 runFile("Stage3_RepairBox.lua") 
 runFile("hold")
 -- =========================================================================
