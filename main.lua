@@ -92,6 +92,9 @@ end)
 task.spawn(function()
     runFile("AutoEquip.lua")
 end)
+task.spawn(function()
+    runFile("join map.lua")
+end)
 
 -- =========================================================================
 -- 🔄 HỆ THỐNG VẬN HÀNH TUẦN TỰ QUA CÁC STAGE GỐC (CHỐNG LỖI LOGIC)
