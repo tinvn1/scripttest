@@ -103,6 +103,7 @@ runFile("Stage1_GetFuel.lua")
 runFile("Stage2_ReturnGen.lua") 
 runFile("Stage3_RepairBox.lua") 
 runFile("hold")
+runFile("camra")
 -- =========================================================================
 -- 🛠️ STAGE 4 VÀ STAGE 5 (XỬ LÝ CUỐI TRẬN ĐỒNG BỘ CHUẨN)
 -- =========================================================================
