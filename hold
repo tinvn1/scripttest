@@ -1,4 +1,4 @@
-task.wait(3)
+task.wait(1)
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
 local StarterGui = game:GetService("StarterGui")
