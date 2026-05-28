@@ -1,150 +1,86 @@
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local localPlayer = Players.LocalPlayer
 
-print("[🛠️ STAGE 4] Kích hoạt luồng Sửa Máy Phát thế hệ mới - Đã FIX LỖI MOBILE...");
-task.wait(0.5) 
+print("[📡 PROMPT DETECTOR] Đang khởi chạy trình dò và ép kích hoạt nút E tương tác...");
 
 -- =========================================================================
--- HÀM ĐỊNH VỊ KHỐI PROMPT CỦA MÁY PHÁT ĐIỆN
+-- 🔍 HÀM QUÉT TẤT CẢ NÚT INTERACT CỦA POWER BOX (Dựa trên hình ảnh Explorer)
 -- =========================================================================
-local function getPowerBoxPromptPart()
+local function findPowerBoxPrompt()
     local descendants = Workspace:GetDescendants()
     for i = 1, #descendants do
         local obj = descendants[i]
+        
+        -- Điều kiện 1: Khóa mục tiêu đúng Model có tên là "Power Box"
         if obj:IsA("Model") and obj.Name == "Power Box" then
-            local promptPart = obj:FindFirstChild("Prompt")
-            if promptPart and promptPart:IsA("BasePart") then
-                return promptPart
-            end
-        end
-    end
-    return nil
-end
-
-local promptPart = nil
-local startTimeScan = os.clock()
-
--- Vòng lặp quét mục tiêu dứt khoát ban đầu
-while not promptPart do
-    promptPart = getPowerBoxPromptPart()
-    if not promptPart then
-        if (os.clock() - startTimeScan) > 15 then
-            warn("[⚠️ STAGE 4 TIMEOUT] Không tìm thấy Power Box sau 15 giây. Nhảy Stage!");
-            _G.CurrentStage = 5
-            return false
-        end
-        task.wait(0.1)
-    end
-end
-
-print("[🖱️ TARGET LOCKED] Đã khóa tọa độ máy phát điện!")
-
-local repairStarted = true
-local startTime = os.clock()
--- Đứng sát phía trên mục tiêu một chút để đảm bảo khoảng cách tương tác luôn chuẩn xác
-local targetPosition = promptPart.Position + Vector3.new(0, 1.2, 0) 
-
--- =========================================================================
--- 🔥 LUỒNG TƯƠNG TÁC ỔN ĐỊNH CHO CẢ PC VÀ MOBILE (ANTI-PATCH)
--- =========================================================================
-task.spawn(function()
-    -- Cố định vị trí nhân vật ngay lập tức bằng CFrame để tránh bị MoveTo làm khựng hành động
-    local char = localPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.lookAt(targetPosition, promptPart.Position)
-        task.wait(0.1)
-    end
-
-    -- Gửi lệnh đè phím E ban đầu (Dành cho PC)
-    pcall(function()
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    end)
-
-    while repairStarted do
-        char = localPlayer.Character
-        root = char and char:FindFirstChild("HumanoidRootPart")
-        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-        
-        if not promptPart or not promptPart.Parent then 
-            break 
-        end
-        
-        if root and humanoid and humanoid.Health > 0 then
-            -- Giữ CFrame quay mặt vào máy mà không dùng MoveTo gây kẹt phím trên Mobile
-            root.CFrame = CFrame.lookAt(targetPosition, promptPart.Position)
-            root.AssemblyLinearVelocity = Vector3.zero 
+            -- Điều kiện 2: Quét sâu bên trong để tìm ProximityPrompt tiềm ẩn
+            local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
             
-            local prompt = promptPart:FindFirstChildWhichIsA("ProximityPrompt") 
-                or promptPart.Parent:FindFirstChildWhichIsA("ProximityPrompt")
+            -- Nếu không tìm thấy ProximityPrompt gốc, kiểm tra xem Part "Prompt" có chứa Prompt ẩn không
+            if not prompt then
+                local promptPart = obj:FindFirstChild("Prompt")
+                if promptPart then
+                    prompt = promptPart:FindFirstChildWhichIsA("ProximityPrompt")
+                end
+            end
             
             if prompt then
-                -- Gọi lệnh giữ phím hệ thống
-                pcall(function()
-                    prompt:InputHoldBegin()
-                end)
-                
-                -- Kích nổ tín hiệu Prompt (Bypass Mobile cực mạnh)
-                if fireproximityprompt then
-                    fireproximityprompt(prompt)
-                end
-                
-                pcall(function()
-                    ProximityPromptService:NotifyPromptTriggered(prompt)
-                end)
+                return prompt, prompt.Parent -- Trả về khối prompt và Part chứa nó
             end
-            
-            -- Chạm vật lý an toàn chống Check-Distance từ Server
-            if firetouchinterest then
-                firetouchinterest(root, promptPart, 0)
-                task.wait(0.02)
-                firetouchinterest(root, promptPart, 1)
-            end
-        else
-            task.wait(0.5)
-        end
-        
-        -- Nhịp chờ 0.2 giây vừa đủ nhanh để nạp tiến trình nhưng không làm quá tải băng thông
-        task.wait(0.2) 
-    end
-
-    -- GIẢI PHÓNG TOÀN BỘ PHÍM KHI XONG VIỆC
-    pcall(function()
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    end)
-    
-    local prompt = promptPart and (promptPart:FindFirstChildWhichIsA("ProximityPrompt") or promptPart.Parent:FindFirstChildWhichIsA("ProximityPrompt"))
-    if prompt then
-        pcall(function() prompt:InputHoldEnd() end)
-    end
-end)
-
--- =========================================================================
--- VÒNG LẶP KIỂM TRA ĐỒNG BỘ THƯỞNG
--- =========================================================================
-local maxWaitTime = 18 
-local bonusDelay = 1.5 
-local promptDisappeared = false
-
-while (os.clock() - startTime) < maxWaitTime do
-    if not promptPart or not promptPart.Parent then
-        if not promptDisappeared then
-            print("[💎 INSURANCE] Máy phát đã biến mất! Chờ Server trả kim cương...")
-            promptDisappeared = true
-            task.wait(bonusDelay)
-            break
         end
     end
-    RunService.Heartbeat:Wait()
+    return nil, nil
 end
 
-repairStarted = false
-print("[🎉 STAGE 4 SUCCESS] Sửa máy phát điện hoàn tất!");
+-- =========================================================================
+-- 🔥 LUỒNG THỰC THI ÉP KÍCH HOẠT THẦN TỐC (BYPASS KHÔNG CẦN NHẤN PHÍM)
+-- =========================================================================
+local targetPrompt, parentPart = findPowerBoxPrompt()
 
-task.wait(0.3)
-_G.CurrentStage = 5
-return true
+if targetPrompt and parentPart then
+    print("[🎯 DETECTED] Đã phát hiện nút E tương tác gốc tại: " .. targetPrompt:GetFullName())
+    
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if root and parentPart:IsA("BasePart") then
+        -- Ép nhân vật dịch chuyển đứng khít vào tọa độ nút để thỏa mãn kiểm tra khoảng cách (Distance Check) của Server
+        root.CFrame = CFrame.new(parentPart.Position + Vector3.new(0, 1, 0))
+        task.wait(0.1)
+    end
+    
+    -- Kích nổ sự kiện giữ phím E giả lập trên hệ thống mạng
+    pcall(function()
+        targetPrompt:InputHoldBegin() -- Khởi động trạng thái giữ
+    end)
+    
+    -- Lệnh tối thượng bypass trên cả thiết bị Mobile và PC
+    if fireproximityprompt then
+        fireproximityprompt(targetPrompt)
+        print("[⚡] Đã gửi lệnh fireproximityprompt thành công!")
+    end
+    
+    -- Đồng bộ thông báo kích hoạt lên toàn hệ thống Client
+    pcall(function()
+        ProximityPromptService:NotifyPromptTriggered(targetPrompt)
+    end)
+    
+    -- Theo dõi cho đến khi máy phát được sửa xong (Vật thể biến mất)
+    local maxDuration = 15
+    local elapsed = 0
+    while targetPrompt and targetPrompt.Parent and elapsed < maxDuration do
+        task.wait(0.2)
+        elapsed = elapsed + 0.2
+    end
+    
+    -- Giải phóng trạng thái nhấn giữ sau khi hoàn thành
+    pcall(function()
+        targetPrompt:InputHoldEnd()
+    end)
+    print("[🎉] Quá trình ép tương tác nút E kết thúc hoàn tất!");
+else
+    warn("[⚠️ NOT FOUND] Hệ thống quét không thấy đối tượng ProximityPrompt (Nút E) nào ẩn trong Power Box.");
+    print("-> Gợi ý: Game đang dùng Custom UI cảm ứng riêng, hãy sử dụng giải pháp Touch Spammer đã cấu hình trước đó.");
+end
