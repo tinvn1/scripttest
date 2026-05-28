@@ -16,6 +16,24 @@ local path = PathfindingService:CreatePath({
 })
 
 -- =========================================================================
+-- 🔥 VÒNG LẶP KHÓA TỐC ĐỘ 30 LIÊN TỤC (LOOP RUN SPEED)
+-- =========================================================================
+task.spawn(function()
+    while true do
+        pcall(function()
+            local char = localPlayer.Character
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                if humanoid.WalkSpeed ~= RUN_SPEED then
+                    humanoid.WalkSpeed = RUN_SPEED
+                end
+            end
+        end)
+        task.wait(0.1) -- Kiểm tra và khóa lại tốc độ mỗi 0.1 giây
+    end
+end)
+
+-- =========================================================================
 -- 🔥 TÍNH NĂNG INF JUMP AN TOÀN (CHỐNG ANTI-CHEAT BAY)
 -- =========================================================================
 local function triggerSafeInfJump(humanoid)
@@ -83,8 +101,6 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
             local waypoint = waypoints[i]
             if not rootPart.Parent or not targetPart.Parent then return false end
             
-            humanoid.WalkSpeed = RUN_SPEED
-            
             if waypoint.Action == Enum.PathWaypointAction.Jump then 
                 triggerSafeInfJump(humanoid)
             end
@@ -105,6 +121,101 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
                 end
                 
                 -- CẢM BIẾN PHÁ RÀO / GỠ KẸT SIÊU TỐC (0.15 Giây)
+                if (os.clock() - startTime) > 0.15 then
+                    local movedDistance = (rootPart.Position - startPos).Magnitude
+                    
+                    -- Nếu dậm chân tại chỗ quá 0.15s (bị cấn góc rào/tường)
+                    if movedDistance < 1.2 then
+                        local pushDirection = (waypoint.Position - rootPart.Position).Unit
+                        
+                        -- Kích hoạt chuỗi nhảy phá kẹt dứt khoát
+                        task.spawn(function()
+                            for _ = 1, 3 do
+                                triggerSafeInfJump(humanoid)
+                                task.wait(0.06)
+                            end
+                        end)
+                        
+                        -- Tăng nhẹ lực đẩy lên Y = 32 và kéo dài thời gian chờ thoát kẹt lên 0.15 giây
+                        rootPart.AssemblyLinearVelocity = (pushDirection * (RUN_SPEED * 1.3)) + Vector3.new(0, 32, 0)
+                        
+                        -- Đi chệch hướng ngẫu nhiên để lách góc cấn
+                        humanoid:MoveTo(waypoint.Position + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2)))
+                        task.wait(0.15)
+                        
+                        isStuck = true 
+                        break 
+                    end
+                    
+                    startTime = os.clock()
+                    startPos = rootPart.Position
+                end
+                
+                task.wait()
+            end
+            
+            if isStuck then 
+                return false 
+            end
+        end
+        return true
+    else
+        -- Phục hồi khẩn cấp khi lỗi Path
+        triggerSafeInfJump(humanoid)
+        rootPart.AssemblyLinearVelocity = (-rootPart.CFrame.LookVector * 15) + Vector3.new(0, 20, 0)
+        task.wait(0.15)
+        return false
+    end
+end
+
+-- =========================================================================
+-- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3
+-- =========================================================================
+print("[STAGE 3] Khởi chạy luồng di chuyển thông minh - Tự động tái định vị khi kẹt...");
+local reached = false
+
+while not reached do
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if root and humanoid and humanoid.Health > 0 then
+        local targetBox = getNearestPowerBox(root.Position)
+        
+        if targetBox then
+            local distance = (root.Position - targetBox.Position).Magnitude
+            
+            if distance > 4.5 then
+                walkPathToTarget(root, humanoid, targetBox)
+            else
+                print("[🎯 STAGE 3 SUCCESS] Đã cập bến trạm điện dứt khoát!");
+                
+                -- ĐOẠN XOAY NGƯỜI ĐỐI DIỆN MÁY ĐIỆN
+                pcall(function()
+                    humanoid:MoveTo(root.Position)
+                    local targetPos = Vector3.new(targetBox.Position.X, root.Position.Y, targetBox.Position.Z)
+                    
+                    for i = 1, 5 do
+                        root.CFrame = CFrame.lookAt(root.Position, targetPos)
+                        task.wait(0.01)
+                    end
+                    print("[🔄 SYSTEM] Đã tự động xoay mặt đối diện Power Box!");
+                end)
+                
+                reached = true
+            end
+        else
+            task.wait(0.1)
+        end
+    else
+        task.wait(0.3)
+    end
+    task.wait(0.02)
+end
+
+task.wait(0.05)
+_G.CurrentStage = 4
+return true
                 if (os.clock() - startTime) > 0.15 then
                     local movedDistance = (rootPart.Position - startPos).Magnitude
                     
