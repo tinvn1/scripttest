@@ -19,12 +19,12 @@ local function onCharacterAdded(character)
             -- Thông báo số lần nhảy hiện tại
             game:GetService("StarterGui"):SetCore("SendNotification", {
                 Title = "Jump Counter",
-                Text = "Bạn đã nhảy: " .. tostring(jumpCount) .. "/50 lần!",
+                Text = "Bạn đã nhảy: " .. tostring(jumpCount) .. "/30 lần!",
                 Duration = 1.5
             })
             
             -- Kiểm tra nếu nhảy từ đủ 25 lần trở lên và Stage 5 chưa từng được bật
-            if jumpCount >= 50 and not stage5Activated then
+            if jumpCount >= 30 and not stage5Activated then
                 stage5Activated = true
                 
                 game:GetService("StarterGui"):SetCore("SendNotification", {
