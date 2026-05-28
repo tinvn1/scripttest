@@ -3,7 +3,7 @@ if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
-print("[🚀 COMBINED SCRIPT] Đang khởi chạy hệ thống Tự động hóa: Kill Aura + Auto Drag...");
+print("[🚀 MOBILE COMBINED] Đang khởi chạy hệ thống gộp: Kill Aura + Mobile Auto Drag...");
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -11,21 +11,22 @@ local Workspace = game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
 -- ====================================================================
--- [PHẦN 1] CẤU HÌNH HỆ THỐNG
+-- BẢNG CẤU HÌNH TỐI ƯU TOÀN DIỆN CHO ĐIỆN THOẠI
 -- ====================================================================
 local CONFIG = {
-    -- Cấu hình Kill Aura
+    -- Cấu hình Kill Aura (Đập quái/Phế liệu)
     AuraEnabled = true,        -- Bật/Tắt Kill Aura
-    MaxDistance = 16,          -- Khoảng cách quét quái (Studs)
-    AttackDelay = 0.1,         -- Tốc độ đánh (Giây)
-    MaxTargets = 4,            -- Tối đa số mục tiêu đánh cùng lúc
+    MaxDistance = 16,          -- Khoảng cách quét (Studs)
+    AttackDelay = 0.12,        -- Tốc độ đánh (0.12s tối ưu cho ping mạng di động)
+    MaxTargets = 4,            -- Tối đa 4 mục tiêu cùng lúc
 
-    -- Cấu hình Auto Drag
+    -- Cấu hình Auto Drag (Nhặt đồ chuẩn Mobile)
     DragEnabled = true,        -- Bật/Tắt Auto Drag
-    DetectRange = 12,          -- Phạm vi tự động quét nhặt đồ (Studs)
-    FollowDistance = 3,        -- Khoảng cách giữ đồ lơ lửng sau lưng (Studs)
+    DetectRange = 9,           -- Tầm quét 9 studs vừa phải để Mobile né gom quá nhiều đồ gây lag
+    FollowDistance = 2.5,      -- Giữ đồ sát hông (2.5 studs) để giảm biên độ lắc lư khi đổi hướng
+    MaxHoldingItems = 8,       -- Giới hạn gom tối đa 8 món để tránh quá tải engine vật lý của điện thoại
 
-    -- Thư mục quét của hệ thống
+    -- Các thư mục quét của game
     SearchFolders = {
         Workspace:FindFirstChild("Characters"),
         Workspace:FindFirstChild("Structures"),
@@ -33,24 +34,22 @@ local CONFIG = {
     DroppedItemsFolder = Workspace:WaitForChild("DroppedItems")
 }
 
--- Bảng lưu trạng thái khóa vật phẩm của Auto Drag
 local holdingItems = {}
+local currentHoldingCount = 0
 
 -- ====================================================================
--- [PHẦN 2] CÁC HÀM BỔ TRỢ (UTILITIES)
+-- CÁC HÀM BỔ TRỢ (UTILITIES)
 -- ====================================================================
 
 -- [Kill Aura] Kiểm tra mục tiêu hợp lệ
 local function isValidTarget(obj, character)
     if not obj or obj == character or obj:IsAncestorOf(character) then return false end
-    if Players:GetPlayerFromCharacter(obj) then return false end -- Né người chơi khác
+    if Players:GetPlayerFromCharacter(obj) then return false end
     
-    -- Nếu là Scrap Pile (Phế liệu) -> Hợp lệ
     if string.find(string.lower(obj.Name), "scrap pile") then
         return true
     end
     
-    -- Nếu là Quái vật (Có Humanoid và còn sống) -> Hợp lệ
     local humanoid = obj:FindFirstChildWhichIsA("Humanoid")
     if humanoid and humanoid.Health > 0 then
         return true
@@ -59,13 +58,12 @@ local function isValidTarget(obj, character)
     return false
 end
 
--- [Kill Aura] Lấy vũ khí và Remote liên quan
+-- [Kill Aura] Lấy vũ khí và Remote
 local function getBatStuff()
     local character = localPlayer.Character
     if character then
         local bat = character:FindFirstChild("Bat")
         local autoTarget = character:FindFirstChild("AutoTargetClient")
-        
         if bat and bat:FindFirstChild("Swing") and bat:FindFirstChild("HitTargets") and autoTarget and autoTarget:FindFirstChild("UpdateNearbyTargets") then
             return bat, autoTarget.UpdateNearbyTargets
         end
@@ -73,7 +71,7 @@ local function getBatStuff()
     return nil, nil
 end
 
--- [Auto Drag] Lấy Remote Event tương tác
+-- [Auto Drag] Lấy Remote kéo đồ
 local function getDragRemote()
     local character = localPlayer.Character
     if not character then return nil end
@@ -81,10 +79,9 @@ local function getDragRemote()
     return dragSystem and dragSystem:FindFirstChild("DragItem") or nil
 end
 
--- [Auto Drag] Kích hoạt hệ thống DragDetector vật lý
+-- [Auto Drag] Giả lập kích hoạt hệ thống DragDetector
 local function triggerDragSystem(item, itemPart)
     local dragDetector = item:FindFirstChildWhichIsA("DragDetector") or item:FindFirstChildOfClass("DragDetector")
-    
     if dragDetector and firesignal then
         firesignal(dragDetector.DragStart, localPlayer)
     end
@@ -97,7 +94,7 @@ local function triggerDragSystem(item, itemPart)
     end
 end
 
--- [Auto Drag] Bật No-Clip (Tắt va chạm) để tránh văng nhân vật
+-- [Auto Drag] Vô hiệu hóa va chạm để chống văng (Anti-Fling)
 local function noClipItem(item)
     if item:IsA("BasePart") then
         item.CanCollide = false
@@ -105,24 +102,29 @@ local function noClipItem(item)
     for _, child in ipairs(item:GetDescendants()) do
         if child:IsA("BasePart") then
             child.CanCollide = false
+            child.Velocity = Vector3.zero
+            child.RotVelocity = Vector3.zero
         end
     end
 end
 
--- [Auto Drag] Xử lý liên kết kéo vật phẩm sau lưng
+-- ====================================================================
+-- LUỒNG XỬ LÝ KÉO ĐỒ CHUẨN MOBILE (CẢI TIẾN KHÓA GÓC XOAY)
+-- ====================================================================
 local function attachmentDrag(item, rootPart)
-    if holdingItems[item] then return end
+    if holdingItems[item] or currentHoldingCount >= CONFIG.MaxHoldingItems then return end
     
     local itemPart = item:FindFirstChild("Union") or item:FindFirstChild("Can") or (item:IsA("Model") and item.PrimaryPart) or item:FindFirstChildWhichIsA("BasePart") or item
     if not itemPart then return end
     
     triggerDragSystem(item, itemPart)
-    task.wait(0.05)
+    task.wait(0.03)
     
     local dragRemote = getDragRemote()
     if not dragRemote then return end
 
     holdingItems[item] = true
+    currentHoldingCount = currentHoldingCount + 1
     noClipItem(item)
 
     task.spawn(function()
@@ -131,43 +133,61 @@ local function attachmentDrag(item, rootPart)
         end)
     end)
 
-    -- Tạo liên kết vật lý giữ khoảng cách an toàn
+    -- Điểm kết nối trên vật phẩm
     local attItem = Instance.new("Attachment")
-    attItem.Name = "DragAttachmentItem"
+    attItem.Name = "MobileDragAttItem"
     attItem.Parent = itemPart
 
+    -- Điểm kết nối sau hông người chơi
     local attPlayer = Instance.new("Attachment")
-    attPlayer.Name = "DragAttachmentPlayer"
-    attPlayer.Position = Vector3.new(0, 1.5, CONFIG.FollowDistance)
+    attPlayer.Name = "MobileDragAttPlayer"
+    attPlayer.Position = Vector3.new(0, 0.5, CONFIG.FollowDistance)
     attPlayer.Parent = rootPart
 
+    -- [Giữ Nguyên Cơ Chế] Kéo vị trí vật thể bằng AlignPosition
     local alignPos = Instance.new("AlignPosition")
-    alignPos.Name = "DragAlign"
+    alignPos.Name = "DragAlignPos"
     alignPos.Mode = Enum.PositionAlignmentMode.TwoAttachment
     alignPos.Attachment0 = attItem
     alignPos.Attachment1 = attPlayer
     alignPos.MaxForce = 99999
-    alignPos.Responsiveness = 25
+    alignPos.Responsiveness = 30
     alignPos.Parent = item
+
+    -- 🔥 [Cải Tiến Cho Mobile] Khóa cứng góc xoay bằng AlignOrientation (Chống cấn tường gây văng)
+    local alignOri = Instance.new("AlignOrientation")
+    alignOri.Name = "DragAlignOri"
+    alignOri.Mode = Enum.OrientationAlignmentMode.TwoAttachment
+    alignOri.Attachment0 = attItem
+    alignOri.Attachment1 = attPlayer
+    alignOri.MaxTorque = 99999
+    alignOri.Responsiveness = 30
+    alignOri.Parent = item
     
-    -- Khóa No-Clip liên tục theo chu kỳ vật lý
+    -- Duy trì No-Clip ổn định theo nhịp Stepped
     local noClipConnection
     noClipConnection = RunService.Stepped:Connect(function()
         if not item or not item.Parent or not holdingItems[item] then
+            if holdingItems[item] then
+                holdingItems[item] = nil
+                currentHoldingCount = math.max(0, currentHoldingCount - 1)
+            end
             noClipConnection:Disconnect()
             return
         end
-        noClipItem(item)
+        if itemPart and itemPart.Parent then
+            itemPart.CanCollide = false
+        end
     end)
 end
 
 -- ====================================================================
--- [PHẦN 3] KÍCH HOẠT VÒNG LẶP ĐỒNG THỜI (CORE LOOPS)
+-- KÍCH HOẠT VÒNG LẶP ĐỒNG THỜI (CORE LOOPS)
 -- ====================================================================
 
--- 1. Khởi chạy Luồng Kill Aura (Chạy ngầm tách biệt)
+-- 1. Luồng chạy Kill Aura độc lập (Cực mượt)
 task.spawn(function()
-    print("[⚔️] Tiến trình Kill Aura đã kích hoạt thành công.");
+    print("[⚔️] Tiến trình Kill Aura Mobile đã kích hoạt.");
     while task.wait(CONFIG.AttackDelay) do
         if not CONFIG.AuraEnabled then continue end
         
@@ -178,7 +198,6 @@ task.spawn(function()
         if hrp and bat then
             local rawTargets = {}
             
-            -- Quét mục tiêu thông thường
             for _, folder in pairs(CONFIG.SearchFolders) do
                 if folder then
                     for _, obj in pairs(folder:GetChildren()) do
@@ -189,7 +208,6 @@ task.spawn(function()
                 end
             end
             
-            -- Quét mục tiêu ẩn (Nil Instances)
             if getnilinstances then
                 for _, obj in pairs(getnilinstances()) do
                     if obj:IsA("Model") and isValidTarget(obj, character) then
@@ -198,7 +216,6 @@ task.spawn(function()
                 end
             end
             
-            -- Sàng lọc khoảng cách
             local validTargetsWithDist = {}
             for _, obj in pairs(rawTargets) do
                 local targetPart = obj:FindFirstChild("HumanoidRootPart") 
@@ -216,7 +233,6 @@ task.spawn(function()
             
             table.sort(validTargetsWithDist, function(a, b) return a.dist < b.dist end)
             
-            -- Tấn công cụm mục tiêu gần nhất
             local targetsToAttack = {}
             for i = 1, math.min(#validTargetsWithDist, CONFIG.MaxTargets) do
                 table.insert(targetsToAttack, validTargetsWithDist[i].instance)
@@ -225,7 +241,6 @@ task.spawn(function()
             if #targetsToAttack > 0 then
                 bat.Swing:FireServer()
                 local packedArgs = { [1] = targetsToAttack }
-                
                 updateNearbyRemote:FireServer(unpack(packedArgs))
                 bat.HitTargets:FireServer(unpack(packedArgs))
             end
@@ -233,26 +248,35 @@ task.spawn(function()
     end
 end)
 
--- 2. Khởi chạy Luồng Auto Drag (Dựa trên khung hình Heartbeat)
+-- 2. Luồng quét nhặt vật phẩm Auto Drag theo khung hình Heartbeat
 RunService.Heartbeat:Connect(function()
     if not CONFIG.DragEnabled then return end
     
     local character = localPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    local rootPart = character.HumanoidRootPart
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
     
-    for _, item in ipairs(CONFIG.DroppedItemsFolder:GetChildren()) do
-        if holdingItems[item] then continue end
+    if currentHoldingCount >= CONFIG.MaxHoldingItems then return end
+    
+    local items = CONFIG.DroppedItemsFolder:GetChildren()
+    for i = 1, #items do
+        local item = items[i]
         
-        local itemPosition = item:IsA("Model") and item:GetPivot().Position or (item:IsA("BasePart") and item.Position)
-        if itemPosition then
-            local distance = (rootPart.Position - itemPosition).Magnitude
-            if distance <= CONFIG.DetectRange then
-                attachmentDrag(item, rootPart)
+        if not holdingItems[item] then
+            local itemPosition = item:IsA("Model") and item:GetPivot().Position or (item:IsA("BasePart") and item.Position)
+            
+            if itemPosition then
+                local distance = (rootPart.Position - itemPosition).Magnitude
+                if distance <= CONFIG.DetectRange then
+                    attachmentDrag(item, rootPart)
+                    if currentHoldingCount >= CONFIG.MaxHoldingItems then 
+                        break 
+                    end
+                end
             end
         end
     end
 end)
 
-print("[🎉 SUCCESS] Toàn bộ hệ thống tính năng đã chạy thay thế hoàn toàn Stage 0!");
+print("[🎉 SUCCESS] Toàn bộ hệ thống Kill Aura + Mobile Auto Drag đã chạy đồng bộ!");
 return true
