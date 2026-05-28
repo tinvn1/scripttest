@@ -1,3 +1,5 @@
+print("[HỆ THỐNG] Đang thiết lập... Vui lòng đợi 3 giây.")
+task.wait(3)
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
