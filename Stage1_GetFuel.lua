@@ -3,7 +3,7 @@ local PathfindingService = game:GetService("PathfindingService")
 local RunService = game:GetService("RunService")
 local localPlayer = game:GetService("Players").LocalPlayer
 
--- Cấu hình tốc độ di chuyển vật lý khi đi nhặt đồ
+-- Cấu hình tốc độ di chuyển vật lý
 local TARGET_SPEED = 30 
 
 -- Cấu hình Pathfinding an toàn chống cạ tường
@@ -58,7 +58,7 @@ local function getTwoNearestFuels(rootPosition)
 end
 
 -- =========================================================================
--- 🔥 HÀM DI CHUYỂN ÁP SÁT (TỐC ĐỘ 30 - KHÔNG XUYÊN TƯỜNG)
+-- 🔥 HÀM DI CHUYỂN LẠI GẦN VÀ HỦY ĐĂNG KÝ Ở MỐC 3 STUDS (KHÔNG NHẶT ĐỒ)
 -- =========================================================================
 local function walkPathToTarget(rootPart, targetPart)
     if not rootPart or not targetPart or not targetPart.Parent then return false end
@@ -66,7 +66,6 @@ local function walkPathToTarget(rootPart, targetPart)
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid then return false end
 
-    -- Thiết lập tốc độ chạy cho Humanoid bằng 30 như bạn yêu cầu
     humanoid.WalkSpeed = TARGET_SPEED
 
     local success, err = pcall(function()
@@ -113,14 +112,15 @@ local function walkPathToTarget(rootPart, targetPart)
             while true do
                 local currentDist = (rootPart.Position - waypoint.Position).Magnitude
                 
-                -- Nút dọc đường: cách 3.5 studs thì rẽ tiếp. Nút sát đích: ép sát < 1.0 studs
+                -- Nút dọc đường: cách 3.5 studs rẽ tiếp. 
+                -- Nút cuối: Cách đúng 3.0 studs là HỦY chặng ngay lập tức
                 if not isLastWaypoint and currentDist < 3.5 then
                     break
-                elseif isLastWaypoint and currentDist < 1.0 then
+                elseif isLastWaypoint and currentDist <= 3.0 then
                     break
                 end
                 
-                -- Phân tích kẹt cạ tường dựa trên tốc độ thực tế
+                -- Phân tích kẹt cạ tường vật lý
                 if (os.clock() - checkTimer) > 0.15 then
                     local movedDistance = (rootPart.Position - lastPosition).Magnitude
                     if movedDistance < 0.5 then 
@@ -132,8 +132,7 @@ local function walkPathToTarget(rootPart, targetPart)
                     lastPosition = rootPart.Position
                 end
 
-                local maxWaitTime = isLastWaypoint and 5 or 3
-                if (os.clock() - loopTimeout) > maxWaitTime then
+                if (os.clock() - loopTimeout) > 4 then
                     needRecalculate = true
                     break
                 end
@@ -158,16 +157,11 @@ local function walkPathToTarget(rootPart, targetPart)
             end
         end
         
-        -- Cú rướn lực cuối: Ép sát dẫm hẳn lên vật phẩm
-        humanoid:MoveTo(targetPart.Position)
-        local forceTimeout = os.clock()
-        while (rootPart.Position - targetPart.Position).Magnitude > 1.5 do
-            if (os.clock() - forceTimeout) > 0.8 then break end
-            RunService.Heartbeat:Wait()
-        end
+        -- Dừng hẳn nhân vật tại mốc 3 studs, không cho bước tiếp
+        humanoid:MoveTo(rootPart.Position) 
         
         local finalDist = (rootPart.Position - targetPart.Position).Magnitude
-        return finalDist < 4.5
+        return finalDist <= 3.5
     else
         humanoid.Jump = true
         task.wait(0.2)
@@ -176,9 +170,9 @@ local function walkPathToTarget(rootPart, targetPart)
 end
 
 -- =========================================================================
--- VÒNG LẶP ĐIỀU KHIỂN CHÍNH (GOM ĐỦ 2 BÌNH RỒI CHUYỂN STAGE)
+-- VÒNG LẶP ĐIỀU KHIỂN CHÍNH (TIẾP CẬN ĐỦ 2 BÌNH RỒI CHUYỂN STAGE)
 -- =========================================================================
-print("[STAGE 1] Khởi chạy hệ thống quét gom đúng 2 bình Fuel với tốc độ 30...")
+print("[STAGE 1] Khởi chạy hệ thống tiếp cận 2 bình Fuel (Tốc độ 30, dừng ở 3 studs)...")
 
 local completedFuels = 0
 local stuckCounter = 0
@@ -188,7 +182,6 @@ while completedFuels < 2 do
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then task.wait(0.5) continue end
     
-    -- Quét tìm 2 bình gần nhất
     local targetList = getTwoNearestFuels(root.Position)
     
     if #targetList > 0 then
@@ -200,22 +193,18 @@ while completedFuels < 2 do
             local targetFuel = fuelData.Part
             local fuelModel = fuelData.Model
             
-            print(string.format("[-->] Tiến tới bình Fuel %d/2 (Tốc độ: 30)", completedFuels + 1))
+            print(string.format("[-->] Đang đi lại gần bình Fuel %d/2...", completedFuels + 1))
             
             local success = walkPathToTarget(root, targetFuel)
             if success then
-                print(string.format("[🎉] Đã chạm bình Fuel thứ %d thành công thực tế!", completedFuels + 1))
+                print(string.format("[🎉] Đã tiếp cận thành công ở khoảng cách 3 studs với mục tiêu %d!", completedFuels + 1))
                 
-                -- Kích hoạt ProximityPrompt nhặt đồ tại chỗ
-                local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or fuelModel:FindFirstChildOfClass("ProximityPrompt")
-                if prompt then fireproximityprompt(prompt) end
-                
+                -- CHỈ HỦY ĐĂNG KÝ VÀ ĐÁNH DẤU HOÀN THÀNH (KHÔNG CÓ LỆNH FIREPROXIMITYPROMPT)
                 ignoredFuels[fuelModel] = true 
                 completedFuels = completedFuels + 1
                 stuckCounter = 0
-                task.wait(0.6) -- Chờ server cập nhật túi đồ
+                task.wait(0.2) -- Giảm thời gian chờ xuống vì không cần đợi server đồng bộ nhặt đồ
                 
-                -- Nếu đã nhặt đủ 2 bình, bẻ gãy vòng lặp ngay lập tức
                 if completedFuels >= 2 then break end
             else
                 stuckCounter = stuckCounter + 1
@@ -227,7 +216,7 @@ while completedFuels < 2 do
             end
         end
     else
-        print("[-] Không tìm thấy Fuel, đang làm sạch danh sách chặn để quét lại...")
+        print("[-] Không tìm thấy Fuel nào khác, quét lại map...")
         ignoredFuels = {}
         task.wait(1)
     end
@@ -236,6 +225,6 @@ end
 -- =========================================================================
 -- ⚡ CHUYỂN THẲNG SANG STAGE 2
 -- =========================================================================
-print("[🚀] ĐÃ NHẶT ĐỦ 2 BÌNH FUEL! Thực hiện chuyển trạng thái...")
+print("[🚀] ĐÃ TIẾP CẬN ĐỦ 2 MỤC TIÊU! Chuyển thẳng hệ thống sang STAGE 2.")
 _G.CurrentStage = 2
 return true
