@@ -90,6 +90,7 @@ end)
 -- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
 -- =========================================================================
 task.spawn(function()
+    runFile("join map")
     runFile("AutoEquip.lua")
 end)
 
@@ -99,7 +100,6 @@ end)
 runFile("Stage1_GetFuel.lua")   
 runFile("Stage2_ReturnGen.lua") 
 runFile("Stage3_RepairBox.lua") 
-runFile("join map")
 -- =========================================================================
 -- 🛠️ STAGE 4 VÀ STAGE 5 (XỬ LÝ CUỐI TRẬN ĐỒNG BỘ CHUẨN)
 -- =========================================================================
