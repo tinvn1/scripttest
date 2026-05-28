@@ -1,56 +1,59 @@
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
-local WEAPON_NAME = "Bat" -- Có thể thay đổi nếu game có vũ khí khác
+local WEAPON_NAME = "Bat" -- Kiểm tra kỹ tên vũ khí xem có đúng là "Bat" không nhé
 
-local function equipWeapon()
+print("[⚔️ SYSTEM] Đang khởi chạy Auto Equip - Chế độ bền bỉ cho Mobile...");
+
+local function attemptEquip()
     pcall(function()
         local char = localPlayer.Character
         if not char then return end
         
+        -- Nếu đã cầm vũ khí thì không làm gì cả
+        if char:FindFirstChild(WEAPON_NAME) then return end
+        
         local humanoid = char:FindFirstChildOfClass("Humanoid")
         local backpack = localPlayer:FindFirstChild("Backpack")
-        
-        -- Nếu đã cầm vũ khí rồi thì bỏ qua
-        if char:FindFirstChild(WEAPON_NAME) then return end
         
         if humanoid and backpack then
             local weapon = backpack:FindFirstChild(WEAPON_NAME)
             if weapon and weapon:IsA("Tool") then
+                -- Ép trang bị với độ trễ thấp để tránh xung đột với hệ thống game
                 humanoid:EquipTool(weapon)
-                print("[⚔️ MOBILE] Đã trang bị " .. WEAPON_NAME .. " thành công!")
+                print("[⚔️] Trang bị thành công: " .. WEAPON_NAME)
             end
         end
     end)
 end
 
 -- =========================================================================
--- 🔥 LOGIC TRANG BỊ TỐI ƯU CHO MOBILE
+-- LOGIC BẢO HIỂM: Tự động trang bị khi có bất kỳ thay đổi nào
 -- =========================================================================
 
--- 1. Chạy thử ngay khi script bắt đầu
-equipWeapon()
-
--- 2. Đảm bảo trang bị khi nhân vật hồi sinh (tăng delay nhẹ cho Mobile)
-localPlayer.CharacterAdded:Connect(function()
-    task.wait(1.5) -- Mobile cần thời gian load UI/Backpack lâu hơn PC
-    equipWeapon()
+-- 1. Trang bị khi nhân vật vừa hồi sinh (Sử dụng task.delay để Mobile kịp load)
+localPlayer.CharacterAdded:Connect(function(char)
+    task.delay(2.5, attemptEquip) -- Chờ 2.5s sau khi hồi sinh
 end)
 
--- 3. BẮT SỰ KIỆN: Nếu vũ khí vừa rơi vào Backpack (do vừa nhặt được), trang bị ngay lập tức
-localPlayer.Backpack.ChildAdded:Connect(function(child)
-    if child.Name == WEAPON_NAME then
-        task.wait(0.2)
-        equipWeapon()
-    end
-end)
+-- 2. Trang bị khi vũ khí vừa xuất hiện trong Backpack (Trường hợp nhặt đồ)
+if localPlayer:FindFirstChild("Backpack") then
+    localPlayer.Backpack.ChildAdded:Connect(function(child)
+        if child.Name == WEAPON_NAME then
+            task.wait(0.5)
+            attemptEquip()
+        end
+    end)
+end
 
--- 4. BẢO HIỂM: Ép kiểm tra định kỳ 5 giây/lần (Chống kẹt vũ khí trong Backpack trên Mobile)
+-- 3. Vòng lặp bảo hiểm (Chạy mỗi 5 giây) - Đây là chìa khóa để không bao giờ mất vũ khí khi Rejoin
 task.spawn(function()
     while true do
-        task.wait(5)
-        equipWeapon()
+        attemptEquip()
+        task.wait(5) -- Kiểm tra lại mỗi 5 giây
     end
 end)
 
-print("[⚔️ SYSTEM] Hệ thống Auto Equip Mobile đã khởi chạy tối ưu!");
+-- Chạy thử lần đầu ngay khi script load
+attemptEquip()
+
 return true
