@@ -87,11 +87,11 @@ task.spawn(function()
 end)
 task.spawn(function()
     -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
-    runFile("join map") 
+    runFile("join_map.lua") 
 end)
 task.spawn(function()
     -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
-    runFile("camera") 
+    runFile("camera.lua") 
 end)
 -- =========================================================================
 -- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
@@ -111,7 +111,7 @@ runFile("Stage1_GetFuel.lua")
 runFile("Stage2_ReturnGen.lua")
 runFile("checkjump.lua")
 runFile("Stage3_RepairBox.lua") 
-runFile("hold")
+runFile("hold.lua")
 -- =========================================================================
 -- 🛠️ STAGE 4 VÀ STAGE 5 (XỬ LÝ CUỐI TRẬN ĐỒNG BỘ CHUẨN)
 -- =========================================================================
