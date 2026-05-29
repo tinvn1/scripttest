@@ -1,195 +1,214 @@
--- =========================================================================
--- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (WITH TOGGLE BUTTON)
--- =========================================================================
-
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
--- Đường dẫn link ảnh RAW từ GitHub của bạn
-local GitHub_Image_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/main/anhnen.jpg"
-local Local_File_Name = "tinvn_hub_background.jpg"
-local Asset_ID = ""
-
--- [XỬ LÝ TẢI ẢNH NGOÀI ROBLOX]
-local success, err = pcall(function()
-    if writefile and readfile and getcustomasset then
-        if not isfile(Local_File_Name) then
-            writefile(Local_File_Name, game:HttpGet(GitHub_Image_URL))
-        end
-        Asset_ID = getcustomasset(Local_File_Name)
-    else
-        Asset_ID = "rbxassetid://16441589139" 
-    end
-end)
-
-if not success or Asset_ID == "" then
-    Asset_ID = "rbxassetid://16441589139"
+-- Chờ trò chơi tải xong xuôi
+if not game:IsLoaded() then
+    game.Loaded:Wait()
 end
 
--- 1. TẠO KHUNG CHÍNH (SCREEN GUI)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Gemini_UltimateToggleHub"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true -- Tràn viền hoàn toàn
-ScreenGui.Parent = PlayerGui
+-- 🕒 Ghi lại mốc thời gian bắt đầu chạy Script (Tính bằng os.clock chính xác cao)
+local startTimeGlobal = os.clock()
+local isForcedRejoining = false -- Biến trạng thái chặn chạy tiếp khi đang Rejoin
 
--- Khung chứa toàn bộ nội dung Hub (Dùng để ẩn/hiện hàng loạt)
-local HubContent = Instance.new("Frame")
-HubContent.Size = UDim2.new(1, 0, 1, 0)
-HubContent.BackgroundTransparency = 1
-HubContent.BorderSizePixel = 0
-HubContent.Visible = true -- Trạng thái mặc định là hiển thị
-HubContent.Parent = ScreenGui
+print("[⚡ SYSTEM] Khởi động Main Loader - Đã tách biệt Stage 0 chạy loadstring từ xa!");
 
--- 2. HÌNH NỀN FULLSCREEN
-local AnimeBackground = Instance.new("ImageLabel")
-AnimeBackground.Size = UDim2.new(1, 0, 1, 0)
-AnimeBackground.Image = Asset_ID
-AnimeBackground.ScaleType = Enum.ScaleType.Crop
-AnimeBackground.Parent = HubContent
-
-local DarkOverlay = Instance.new("Frame")
-DarkOverlay.Size = UDim2.new(1, 0, 1, 0)
-DarkOverlay.BackgroundColor3 = Color3.fromRGB(10, 14, 18)
-DarkOverlay.BackgroundTransparency = 0.4
-DarkOverlay.BorderSizePixel = 0
-DarkOverlay.Parent = HubContent
-
--- 3. TRUNG TÂM ĐIỀU KHIỂN & THEO DÕI THÔNG SỐ (CENTER PANEL)
-local InfoArea = Instance.new("Frame")
-InfoArea.Size = UDim2.new(0, 400, 0, 150)
-InfoArea.Position = UDim2.new(0.5, -200, 0.75, -75)
-InfoArea.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
-InfoArea.BackgroundTransparency = 0.25
-InfoArea.BorderSizePixel = 0
-InfoArea.Parent = HubContent
-
-local InfoCorner = Instance.new("UICorner")
-InfoCorner.CornerRadius = UDim.new(0, 12)
-InfoCorner.Parent = InfoArea
-
-local InfoStroke = Instance.new("UIStroke")
-InfoStroke.Color = Color3.fromRGB(0, 230, 255)
-InfoStroke.Thickness = 1.5
-InfoStroke.Parent = InfoArea
-
-local SystemTag = Instance.new("TextLabel")
-SystemTag.Size = UDim2.new(1, -30, 0, 25)
-SystemTag.Position = UDim2.new(0, 20, 0, 15)
-SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // TOGGLE_MODE"
-SystemTag.TextColor3 = Color3.fromRGB(140, 160, 180)
-SystemTag.TextSize = 11
-SystemTag.Font = Enum.Font.Code
-SystemTag.TextXAlignment = Enum.TextXAlignment.Left
-SystemTag.BackgroundTransparency = 1
-SystemTag.Parent = InfoArea
-
-local GemValueLabel = Instance.new("TextLabel")
-GemValueLabel.Size = UDim2.new(1, -30, 0, 50)
-GemValueLabel.Position = UDim2.new(0, 20, 0, 40)
-GemValueLabel.Text = "💎 Loading..."
-GemValueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-GemValueLabel.TextSize = 36
-GemValueLabel.Font = Enum.Font.GothamBold
-GemValueLabel.TextXAlignment = Enum.TextXAlignment.Left
-GemValueLabel.BackgroundTransparency = 1
-GemValueLabel.Parent = InfoArea
-
-local TextStroke = Instance.new("UIStroke")
-TextStroke.Color = Color3.fromRGB(0, 230, 255)
-TextStroke.Thickness = 0.5
-TextStroke.Transparency = 0.5
-TextStroke.Parent = GemValueLabel
-
-local StatusBar = Instance.new("Frame")
-StatusBar.Size = UDim2.new(1, -40, 0, 3)
-StatusBar.Position = UDim2.new(0, 20, 0, 95)
-StatusBar.BackgroundColor3 = Color3.fromRGB(0, 230, 255)
-StatusBar.BorderSizePixel = 0
-StatusBar.Parent = InfoArea
-
-local BarCorner = Instance.new("UICorner")
-BarCorner.CornerRadius = UDim.new(0, 2)
-BarCorner.Parent = StatusBar
-
-local StatusText = Instance.new("TextLabel")
-StatusText.Size = UDim2.new(1, -30, 0, 20)
-StatusText.Position = UDim2.new(0, 20, 0, 105)
-StatusText.Text = "STATUS: ACTIVE // OVERLAY_CONNECTED"
-StatusText.TextColor3 = Color3.fromRGB(0, 230, 255)
-StatusText.TextSize = 10
-StatusText.Font = Enum.Font.Code
-StatusText.TextXAlignment = Enum.TextXAlignment.Left
-StatusText.BackgroundTransparency = 1
-StatusText.Parent = InfoArea
+local baseUrl = "https://raw.githubusercontent.com/tinvn1/scripttest/refs/heads/main/"
 
 -- =========================================================================
--- 4. NÚT BẤM ẨN / HIỆN TẤT CẢ (TOGGLE BUTTON)
+-- ⏱️ LUỒNG ÉP REJOIN KHẨN CẤP ĐÚNG 2 PHÚT (CHẠY SONG SONG)
 -- =========================================================================
--- Nút bấm được đặt riêng độc lập với HubContent để nó không bị ẩn đi cùng Hub
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 80, 0, 30)
-ToggleButton.Position = UDim2.new(0, 20, 0, 40) -- Nằm ở góc trên bên trái, bên dưới thanh công cụ Roblox một chút
-ToggleButton.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
-ToggleButton.Text = "ẨN HUB"
-ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
-ToggleButton.TextSize = 12
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = ScreenGui
-
-local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(0, 6)
-ButtonCorner.Parent = ToggleButton
-
-local ButtonStroke = Instance.new("UIStroke")
-ButtonStroke.Color = Color3.fromRGB(0, 230, 255)
-ButtonStroke.Thickness = 1
-ButtonStroke.Parent = ToggleButton
-
--- Logic xử lý khi click chuột vào nút bấm
-ToggleButton.MouseButton1Click:Connect(function()
-    if HubContent.Visible == true then
-        HubContent.Visible = false
-        ToggleButton.Text = "HIỆN HUB"
-        ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ButtonStroke.Color = Color3.fromRGB(100, 100, 100) -- Đổi viền sang xám khi đóng
-    else
-        HubContent.Visible = true
-        ToggleButton.Text = "ẨN HUB"
-        ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
-        ButtonStroke.Color = Color3.fromRGB(0, 230, 255) -- Đổi viền về Neon xanh khi mở
-    end
-end)
-
--- =========================================================================
--- LOGIC ĐỒNG BỘ GEM THEO THỜI GIAN THỰC
--- =========================================================================
-local function updateGemDisplay(text)
-    GemValueLabel.Text = "💎 " .. tostring(text)
-end
-
 task.spawn(function()
-    local mainUI = PlayerGui:WaitForChild("MainUI", 15)
-    local gemDisplay = mainUI and mainUI:WaitForChild("GemDisplay", 15)
-    local gemCountObject = gemDisplay and gemDisplay:WaitForChild("Count", 15)
+    local TeleportService = game:GetService("TeleportService")
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
 
-    while not gemCountObject do
-        pcall(function()
-            gemCountObject = PlayerGui.MainUI.GemDisplay.Count
-        end)
-        if gemCountObject then break end
-        task.wait(0.5)
-    end
-
-    if gemCountObject then
-        updateGemDisplay(gemCountObject.Text)
-        gemCountObject:GetPropertyChangedSignal("Text"):Connect(function()
-            updateGemDisplay(gemCountObject.Text)
-        end)
-        print("[🚀 SYSTEM] Đã kích hoạt Fullscreen Hub & Toggle Button!");
-    else
-        GemValueLabel.Text = "💎 ERROR";
-        GemValueLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
+    while not isForcedRejoining do
+        local elapsed = os.clock() - startTimeGlobal
+        
+        -- 🔥 Nếu quá mốc 2 phút (120 giây) -> Ép Rejoin server mới lập tức để tránh treo máy
+        if elapsed >= 120 then
+            isForcedRejoining = true
+            print("[⚠️ TIMEOUT] Đã chạm mốc 2 phút khẩn cấp! Đang ép Rejoin...");
+            
+            local PlayerGui = localPlayer:WaitForChild("PlayerGui")
+            for _, obj in pairs(PlayerGui:GetDescendants()) do
+                if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
+                    if obj.Visible and obj.AbsolutePosition.Y > 0 then
+                        if getconnections then
+                            for _, connection in pairs(getconnections(obj.MouseButton1Click)) do connection:Fire() end
+                        end
+                        obj.MouseButton1Click:Fire()
+                        break
+                    end
+                end
+            end
+            
+            local teleportOptions = Instance.new("TeleportOptions")
+            teleportOptions.ServerInstanceId = game.JobId
+            while true do
+                pcall(function()
+                    TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
+                end)
+                task.wait(1)
+            end
+            break
+        end
+        task.wait(0.1)
     end
 end)
+
+-- Hàm nạp file từ GitHub có sửa lỗi ký tự hệ thống tự động
+local function runFile(fileName)
+    if isForcedRejoining then return end
+
+    local success, content = pcall(function() 
+        return game:HttpGet(baseUrl .. fileName) 
+    end)
+    
+    if success and content then
+        content = string.gsub(content, "Enum%.PathJointAction", "Enum.PathWaypointAction")
+        content = string.gsub(content, "PathJointAction", "PathWaypointAction")
+        
+        local func, err = loadstring(content)
+        if func then
+            print("[▶️ RUNNING] Cấu phần: " .. fileName)
+            func()
+        else
+            warn("Lỗi biên dịch cấu phần: " .. fileName .. " | " .. tostring(err))
+        end
+    else
+        warn("Không thể tải file từ GitHub: " .. fileName)
+    end
+end
+
+-- =========================================================================
+-- 🛡️ CHẠY STAGE 0 HOÀN HẢO RIÊNG BIỆT QUA LOADSTRING TỪ GITHUB
+-- =========================================================================
+task.spawn(function()
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("Stage0_ZHUB.lua") 
+end)
+task.spawn(function()
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("join map") 
+end)
+task.spawn(function()
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("camera") 
+end)
+-- =========================================================================
+-- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
+-- =========================================================================
+task.spawn(function()
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("AutoEquip.lua ") 
+end)
+-- =========================================================================
+-- 🔄 HỆ THỐNG VẬN HÀNH TUẦN TỰ QUA CÁC STAGE GỐC (CHỐNG LỖI LOGIC)
+-- =========================================================================
+runFile("Stage1_GetFuel.lua")   
+runFile("Stage2_ReturnGen.lua")
+runFile("checkjump.lua")
+runFile("Stage3_RepairBox.lua") 
+runFile("hold")
+-- =========================================================================
+-- 🛠️ STAGE 4 VÀ STAGE 5 (XỬ LÝ CUỐI TRẬN ĐỒNG BỘ CHUẨN)
+-- =========================================================================
+local function runOptimizedStage4()
+    if isForcedRejoining then return end
+    local Workspace = game:GetService("Workspace")
+    local RunService = game:GetService("RunService")
+    local localPlayer = game:GetService("Players").LocalPlayer
+
+    local function getPowerBoxPrompt()
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                if obj.Parent and obj.Parent.Name == "Power Box" then return obj
+                elseif string.find(string.lower(obj.ObjectText), "power plant") or string.find(string.lower(obj.ActionText), "repair") then return obj end
+            end
+        end
+        return nil
+    end
+
+    local repairStarted = false
+    local startTime = os.clock()
+    local holdConnection = nil
+
+    local stage4Connection
+    stage4Connection = RunService.Heartbeat:Connect(function()
+        if isForcedRejoining then
+            if stage4Connection then stage4Connection:Disconnect() end
+            return
+        end
+
+        local prompt = getPowerBoxPrompt()
+        if prompt then
+            if prompt.RequiresLineOfSight then prompt.RequiresLineOfSight = false end
+            if prompt.MaxActivationDistance < 15 then prompt.MaxActivationDistance = 25 end
+
+            if not repairStarted then
+                repairStarted = true
+                startTime = os.clock()
+                
+                holdConnection = task.spawn(function()
+                    while repairStarted and prompt and prompt.Parent and not isForcedRejoining do
+                        if prompt.HoldDuration > 0 then prompt:InputHoldBegin() end
+                        fireproximityprompt(prompt)
+                        task.wait(0.04) 
+                    end
+                end)
+            end
+            
+            if repairStarted and (os.clock() - startTime) >= 16 then
+                stage4Connection:Disconnect()
+            end
+        else
+            if repairStarted then stage4Connection:Disconnect() end
+        end
+    end)
+
+    while stage4Connection.Connected do task.wait() end
+
+    repairStarted = false
+    if holdConnection then task.cancel(holdConnection) end
+    local finalPrompt = getPowerBoxPrompt()
+    if finalPrompt then pcall(function() finalPrompt:InputHoldEnd() end) end
+end
+
+local function runOptimizedStage5()
+    if isForcedRejoining then return end
+    local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    local RunService = game:GetService("RunService")
+    local localPlayer = Players.LocalPlayer
+
+    local PlayerGui = localPlayer:WaitForChild("PlayerGui")
+    local foundButton = nil
+    local startTime = os.clock()
+    
+    while not foundButton and (os.clock() - startTime) < 15 and not isForcedRejoining do
+        for _, obj in pairs(PlayerGui:GetDescendants()) do
+            if obj:IsA("TextButton") and (string.find(string.lower(obj.Text), "play again") or obj.Name == "PlayAgain") then
+                if obj.Visible and obj.AbsolutePosition.Y > 0 then
+                    foundButton = obj
+                    break
+                end
+            end
+        end
+        if foundButton then break end
+        RunService.Heartbeat:Wait()
+    end
+    
+    if foundButton and not isForcedRejoining then
+        if getconnections then
+            for _, connection in pairs(getconnections(foundButton.MouseButton1Click)) do connection:Fire() end
+        end
+        foundButton.MouseButton1Click:Fire()
+        
+        local teleportOptions = Instance.new("TeleportOptions")
+        teleportOptions.ServerInstanceId = game.JobId
+        pcall(function()
+            TeleportService:TeleportAsync(game.PlaceId, {localPlayer}, teleportOptions)
+        end)
+    end
+end
+
+runOptimizedStage4()
+runOptimizedStage5()
