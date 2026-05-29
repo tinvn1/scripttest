@@ -2,7 +2,7 @@ task.wait(1)
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
 local StarterGui = game:GetService("StarterGui")
-
+local OFFSET_DOWN = 20     -- Độ thấp dưới tâm màn hình (pixel)
 -- Thông báo bắt đầu giữ
 StarterGui:SetCore("SendNotification", {
     Title = "Auto Hold (PC/Mobile)",
