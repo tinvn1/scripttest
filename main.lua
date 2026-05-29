@@ -137,17 +137,14 @@ end
 -- =========================================================================
 -- NẠP CÁC FILE ĐIỀU KHIỂN NỀN (ĐÃ FIX LỖI CÚ PHÁP VÀ GIÃN CÁCH TRÁNH LAG)
 -- =========================================================================
-task.spawn(function()
-    runFile("Stage0_ZHUB.lua")
-    task.wait(0.15)
-    runFile("join_map.lua")
-    task.wait(0.15)
-    runFile("camera.lua")
-    task.wait(0.15)
-    runFile("AutoEquip.lua")
-    task.wait(0.15)
-    runFile("checker.lua")
-end)
+-- =========================================================================
+-- NẠP CÁC FILE ĐIỀU KHIỂN NỀN (CHẠY ĐỘC LẬP HOÀN TOÀN SONG SONG)
+-- =========================================================================
+task.spawn(function() runFile("Stage0_ZHUB.lua") end)
+task.spawn(function() runFile("join_map.lua") end)
+task.spawn(function() runFile("camera.lua") end)
+task.spawn(function() runFile("AutoEquip.lua") end)
+task.spawn(function() runFile("checker.lua") end)
 
 -- =========================================================================
 -- STAGE 5 (HÀM XỬ LÝ NÚT PLAY AGAIN KHU VỰC CUỐI TRẬN)
