@@ -1,81 +1,69 @@
 -- =========================================================================
--- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (GITHUB EXTERNAL IMAGE VERSION)
+-- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (WITH TOGGLE BUTTON)
 -- =========================================================================
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Đường dẫn link ảnh RAW trực tiếp từ kho lưu trữ GitHub của bạn
+-- Đường dẫn link ảnh RAW từ GitHub của bạn
 local GitHub_Image_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/main/anhnen.jpg"
 local Local_File_Name = "tinvn_hub_background.jpg"
 local Asset_ID = ""
 
--- [XỬ LÝ TẢI ẢNH NGOÀI ROBLOX] 
--- Kiểm tra xem Executor của bạn có hỗ trợ tải file internet hay không
+-- [XỬ LÝ TẢI ẢNH NGOÀI ROBLOX]
 local success, err = pcall(function()
-    if writefile and readfile and getcustomasset and syn then
-        -- Tải dữ liệu ảnh từ GitHub và lưu tạm vào thư mục workspace của Executor
-        if not isfile(Local_File_Name) then
-            writefile(Local_File_Name, game:HttpGet(GitHub_Image_URL))
-        end
-        -- Chuyển đổi file vừa tải thành định dạng tài nguyên mà Roblox đọc được
-        Asset_ID = getcustomasset(Local_File_Name)
-    elseif writefile and readfile and getcustomasset then -- Cho các bản Exploit tiêu chuẩn khác
+    if writefile and readfile and getcustomasset then
         if not isfile(Local_File_Name) then
             writefile(Local_File_Name, game:HttpGet(GitHub_Image_URL))
         end
         Asset_ID = getcustomasset(Local_File_Name)
     else
-        -- Nếu Executor không hỗ trợ, tự động dùng lại ID dự phòng trên hệ thống Roblox
         Asset_ID = "rbxassetid://16441589139" 
     end
 end)
 
 if not success or Asset_ID == "" then
-    Asset_ID = "rbxassetid://16441589139" -- ID dự phòng nếu lỗi tải file
+    Asset_ID = "rbxassetid://16441589139"
 end
 
--- 1. TẠO KHUNG CHÍNH TRÀN MÀN HÌNH (FULLSCREEN HUB)
+-- 1. TẠO KHUNG CHÍNH (SCREEN GUI)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Gemini_UltimateExternalHub"
+ScreenGui.Name = "Gemini_UltimateToggleHub"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true -- Bỏ qua thanh công cụ của Roblox để tràn viền hoàn toàn
+ScreenGui.IgnoreGuiInset = true -- Tràn viền hoàn toàn
 ScreenGui.Parent = PlayerGui
 
--- Khung nền bao phủ toàn bộ màn hình
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(1, 0, 1, 0)
-MainFrame.Position = UDim2.new(0, 0, 0, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 18)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Parent = ScreenGui
+-- Khung chứa toàn bộ nội dung Hub (Dùng để ẩn/hiện hàng loạt)
+local HubContent = Instance.new("Frame")
+HubContent.Size = UDim2.new(1, 0, 1, 0)
+HubContent.BackgroundTransparency = 1
+HubContent.BorderSizePixel = 0
+HubContent.Visible = true -- Trạng thái mặc định là hiển thị
+HubContent.Parent = ScreenGui
 
--- 2. HÌNH NỀN FULLSCREEN (Sử dụng asset vừa tải từ GitHub về)
+-- 2. HÌNH NỀN FULLSCREEN
 local AnimeBackground = Instance.new("ImageLabel")
 AnimeBackground.Size = UDim2.new(1, 0, 1, 0)
-AnimeBackground.Position = UDim2.new(0, 0, 0, 0)
-AnimeBackground.Image = Asset_ID -- Gán link ảnh ngoài đã chuyển đổi ở đây
-AnimeBackground.ScaleType = Enum.ScaleType.Crop -- Tự động co giãn chuẩn tỉ lệ mọi màn hình
-AnimeBackground.Parent = MainFrame
+AnimeBackground.Image = Asset_ID
+AnimeBackground.ScaleType = Enum.ScaleType.Crop
+AnimeBackground.Parent = HubContent
 
--- Lớp phủ tối (Overlay) giúp làm dịu ảnh nền, làm nổi bật các thông số hiển thị
 local DarkOverlay = Instance.new("Frame")
 DarkOverlay.Size = UDim2.new(1, 0, 1, 0)
 DarkOverlay.BackgroundColor3 = Color3.fromRGB(10, 14, 18)
 DarkOverlay.BackgroundTransparency = 0.4
 DarkOverlay.BorderSizePixel = 0
-DarkOverlay.Parent = MainFrame
+DarkOverlay.Parent = HubContent
 
 -- 3. TRUNG TÂM ĐIỀU KHIỂN & THEO DÕI THÔNG SỐ (CENTER PANEL)
 local InfoArea = Instance.new("Frame")
 InfoArea.Size = UDim2.new(0, 400, 0, 150)
-InfoArea.Position = UDim2.new(0.5, -200, 0.75, -75) -- Đặt ở nửa dưới màn hình để không che mặt nhân vật
+InfoArea.Position = UDim2.new(0.5, -200, 0.75, -75)
 InfoArea.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
-InfoArea.BackgroundTransparency = 0.25 -- Hiệu ứng kính mờ Cyberpunk
+InfoArea.BackgroundTransparency = 0.25
 InfoArea.BorderSizePixel = 0
-InfoArea.Parent = MainFrame
+InfoArea.Parent = HubContent
 
 local InfoCorner = Instance.new("UICorner")
 InfoCorner.CornerRadius = UDim.new(0, 12)
@@ -86,11 +74,10 @@ InfoStroke.Color = Color3.fromRGB(0, 230, 255)
 InfoStroke.Thickness = 1.5
 InfoStroke.Parent = InfoArea
 
--- Tiêu đề hệ thống
 local SystemTag = Instance.new("TextLabel")
 SystemTag.Size = UDim2.new(1, -30, 0, 25)
 SystemTag.Position = UDim2.new(0, 20, 0, 15)
-SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // EXT_IMAGE_MODE"
+SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // TOGGLE_MODE"
 SystemTag.TextColor3 = Color3.fromRGB(140, 160, 180)
 SystemTag.TextSize = 11
 SystemTag.Font = Enum.Font.Code
@@ -98,7 +85,6 @@ SystemTag.TextXAlignment = Enum.TextXAlignment.Left
 SystemTag.BackgroundTransparency = 1
 SystemTag.Parent = InfoArea
 
--- Ô hiển thị lượng Gem số lớn
 local GemValueLabel = Instance.new("TextLabel")
 GemValueLabel.Size = UDim2.new(1, -30, 0, 50)
 GemValueLabel.Position = UDim2.new(0, 20, 0, 40)
@@ -116,7 +102,6 @@ TextStroke.Thickness = 0.5
 TextStroke.Transparency = 0.5
 TextStroke.Parent = GemValueLabel
 
--- Thanh trạng thái Neon trang trí
 local StatusBar = Instance.new("Frame")
 StatusBar.Size = UDim2.new(1, -40, 0, 3)
 StatusBar.Position = UDim2.new(0, 20, 0, 95)
@@ -128,7 +113,6 @@ local BarCorner = Instance.new("UICorner")
 BarCorner.CornerRadius = UDim.new(0, 2)
 BarCorner.Parent = StatusBar
 
--- Dòng chữ trạng thái kết nối
 local StatusText = Instance.new("TextLabel")
 StatusText.Size = UDim2.new(1, -30, 0, 20)
 StatusText.Position = UDim2.new(0, 20, 0, 105)
@@ -141,9 +125,46 @@ StatusText.BackgroundTransparency = 1
 StatusText.Parent = InfoArea
 
 -- =========================================================================
--- LOGIC KIỂM TRA VÀ ĐỒNG BỘ GEM THEO THỜI GIAN THỰC
+-- 4. NÚT BẤM ẨN / HIỆN TẤT CẢ (TOGGLE BUTTON)
 -- =========================================================================
+-- Nút bấm được đặt riêng độc lập với HubContent để nó không bị ẩn đi cùng Hub
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 80, 0, 30)
+ToggleButton.Position = UDim2.new(0, 20, 0, 40) -- Nằm ở góc trên bên trái, bên dưới thanh công cụ Roblox một chút
+ToggleButton.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
+ToggleButton.Text = "ẨN HUB"
+ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
+ToggleButton.TextSize = 12
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Parent = ScreenGui
 
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 6)
+ButtonCorner.Parent = ToggleButton
+
+local ButtonStroke = Instance.new("UIStroke")
+ButtonStroke.Color = Color3.fromRGB(0, 230, 255)
+ButtonStroke.Thickness = 1
+ButtonStroke.Parent = ToggleButton
+
+-- Logic xử lý khi click chuột vào nút bấm
+ToggleButton.MouseButton1Click:Connect(function()
+    if HubContent.Visible == true then
+        HubContent.Visible = false
+        ToggleButton.Text = "HIỆN HUB"
+        ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ButtonStroke.Color = Color3.fromRGB(100, 100, 100) -- Đổi viền sang xám khi đóng
+    else
+        HubContent.Visible = true
+        ToggleButton.Text = "ẨN HUB"
+        ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
+        ButtonStroke.Color = Color3.fromRGB(0, 230, 255) -- Đổi viền về Neon xanh khi mở
+    end
+end)
+
+-- =========================================================================
+-- LOGIC ĐỒNG BỘ GEM THEO THỜI GIAN THỰC
+-- =========================================================================
 local function updateGemDisplay(text)
     GemValueLabel.Text = "💎 " .. tostring(text)
 end
@@ -166,7 +187,7 @@ task.spawn(function()
         gemCountObject:GetPropertyChangedSignal("Text"):Connect(function()
             updateGemDisplay(gemCountObject.Text)
         end)
-        print("[🚀 SYSTEM] Đã kích hoạt Fullscreen Hub bằng ảnh GitHub thành công!");
+        print("[🚀 SYSTEM] Đã kích hoạt Fullscreen Hub & Toggle Button!");
     else
         GemValueLabel.Text = "💎 ERROR";
         GemValueLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
