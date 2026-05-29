@@ -103,6 +103,7 @@ end)
 -- =========================================================================
 -- 🔄 HỆ THỐNG VẬN HÀNH TUẦN TỰ QUA CÁC STAGE GỐC (CHỐNG LỖI LOGIC)
 -- =========================================================================
+runFile("checker.lua")
 runFile("Stage1_GetFuel.lua")   
 runFile("Stage2_ReturnGen.lua")
 runFile("checkjump.lua")
