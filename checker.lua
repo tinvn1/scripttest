@@ -1,5 +1,5 @@
 -- =========================================================================
--- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (CHÌM DƯỚI GIAO DIỆN GAME)
+-- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (WITH TOGGLE BUTTON)
 -- =========================================================================
 
 local Players = game:GetService("Players")
@@ -31,9 +31,7 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Gemini_UltimateToggleHub"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true  -- Tràn viền hoàn toàn
--- 🛠️ Đổi thứ tự hiển thị xuống dưới cùng để không đè lên các nút bấm của game
-ScreenGui.DisplayOrder = -10     
+ScreenGui.IgnoreGuiInset = true -- Tràn viền hoàn toàn
 ScreenGui.Parent = PlayerGui
 
 -- Khung chứa toàn bộ nội dung Hub (Dùng để ẩn/hiện hàng loạt)
@@ -129,23 +127,16 @@ StatusText.Parent = InfoArea
 -- =========================================================================
 -- 4. NÚT BẤM ẨN / HIỆN TẤT CẢ (TOGGLE BUTTON)
 -- =========================================================================
--- Tạo riêng một ScreenGui có DisplayOrder cao cho nút bấm để nút không bị chìm/ẩn mất dưới map
-local ButtonGui = Instance.new("ScreenGui")
-ButtonGui.Name = "Gemini_HubToggleButton"
-ButtonGui.ResetOnSpawn = false
--- 🛠️ Giữ nguyên hoặc đặt giá trị cao để nút bấm này luôn nằm trên cùng, dễ tương tác
-ButtonGui.DisplayOrder = 10 
-ButtonGui.Parent = PlayerGui
-
+-- Nút bấm được đặt riêng độc lập với HubContent để nó không bị ẩn đi cùng Hub
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 80, 0, 30)
-ToggleButton.Position = UDim2.new(0, 20, 0, 45) -- Dịch xuống một chút để tránh đè Chatbar mặc định
+ToggleButton.Position = UDim2.new(0, 20, 0, 40) -- Nằm ở góc trên bên trái, bên dưới thanh công cụ Roblox một chút
 ToggleButton.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
 ToggleButton.Text = "ẨN HUB"
 ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
 ToggleButton.TextSize = 12
 ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = ButtonGui
+ToggleButton.Parent = ScreenGui
 
 local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(0, 6)
@@ -162,12 +153,12 @@ ToggleButton.MouseButton1Click:Connect(function()
         HubContent.Visible = false
         ToggleButton.Text = "HIỆN HUB"
         ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ButtonStroke.Color = Color3.fromRGB(100, 100, 100)
+        ButtonStroke.Color = Color3.fromRGB(100, 100, 100) -- Đổi viền sang xám khi đóng
     else
         HubContent.Visible = true
         ToggleButton.Text = "ẨN HUB"
         ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
-        ButtonStroke.Color = Color3.fromRGB(0, 230, 255)
+        ButtonStroke.Color = Color3.fromRGB(0, 230, 255) -- Đổi viền về Neon xanh khi mở
     end
 end)
 
@@ -196,7 +187,7 @@ task.spawn(function()
         gemCountObject:GetPropertyChangedSignal("Text"):Connect(function()
             updateGemDisplay(gemCountObject.Text)
         end)
-        print("[🚀 SYSTEM] Đã kích hoạt Fullscreen Hub & Toggle Button bên dưới lớp Layer Game!");
+        print("[🚀 SYSTEM] Đã kích hoạt Fullscreen Hub & Toggle Button!");
     else
         GemValueLabel.Text = "💎 ERROR";
         GemValueLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
