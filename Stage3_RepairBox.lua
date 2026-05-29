@@ -1,4 +1,4 @@
-print("[HỆ THỐNG] Đang thiết lập... Vui lòng đợi 3 giây.")
+print("[HỆ THỐNG] Đang thiết lập cấu hình tối ưu Mobile... Vui lòng đợi 3 giây.")
 task.wait(3)
 local Workspace = game:GetService("Workspace")
 local PathfindingService = game:GetService("PathfindingService")
@@ -7,15 +7,14 @@ local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
 local RUN_SPEED = 30
 
--- Cấu hình Path tối ưu chống cọ tường vật lý
+-- Cấu hình Path mở rộng bán kính tối đa cho Mobile để đi xa tường hẳn ra
 local path = PathfindingService:CreatePath({
-    AgentRadius = 2.0, -- Tăng nhẹ bán kính để nhân vật đi xa tường hơn, tránh kẹt kịch khung
+    AgentRadius = 2.8, -- Tăng mạnh để tạo khoảng cách an toàn tuyệt đối với bờ tường
     AgentHeight = 5.0,
     AgentCanJump = true,
     Costs = { Water = math.huge }
 })
 
--- Biến kiểm soát Cooldown nhảy tránh bị spam dậm chân tại chỗ
 local lastJumpTime = 0
 local JUMP_COOLDOWN = 0.25 
 
@@ -34,7 +33,7 @@ local speedLoop = task.spawn(function()
 end)
 
 -- =========================================================================
--- 🔥 2. NHẢY VÔ HẠN AN TOÀN (CÓ CHỐNG SPAM NHẢY MỘT CHỖ)
+-- 🔥 2. NHẢY VÔ HẠN AN TOÀN CHỐNG SPAM
 -- =========================================================================
 local function triggerSafeInfJump(humanoid)
     local now = os.clock()
@@ -84,7 +83,7 @@ local function getNearestPowerBox(rootPosition)
 end
 
 -- =========================================================================
--- 🔥 HÀM DI CHUYỂN CẢI TIẾN - SỬA LỖI NHẢY LẶP LẠI MỘT CHỖ
+-- 🔥 HÀM DI CHUYỂN FIXED CHO MOBILE - CHỐNG CỌ TƯỜNG, ÉP TÍNH ĐƯỜNG MỚI
 -- =========================================================================
 local function walkPathToTarget(rootPart, humanoid, targetPart)
     if not rootPart or not targetPart or not targetPart.Parent then return false end
@@ -106,7 +105,6 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
             local waypoint = waypoints[i]
             if not rootPart.Parent or not targetPart.Parent then return false end
             
-            -- Nếu waypoint yêu cầu nhảy, chỉ kích hoạt nhảy hợp lý
             if waypoint.Action == Enum.PathWaypointAction.Jump then 
                 triggerSafeInfJump(humanoid)
             end
@@ -116,44 +114,40 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
             local startPos = rootPart.Position
             local startTime = os.clock()
             local isStuck = false
-            local jumpCountThisWaypoint = 0 -- Đếm số lần nhảy tại waypoint hiện tại
             
             while true do
                 local currentDist = (rootPart.Position - waypoint.Position).Magnitude
                 
+                -- Tăng bán kính nhận diện Waypoint lên một chút để bù trừ độ trễ FPS trên Mobile
                 if i == totalWaypoints then
-                    if currentDist < 3.0 then break end
+                    if currentDist < 3.5 then break end
                 else
-                    if currentDist < 4.5 then break end 
+                    if currentDist < 5.0 then break end 
                 end
                 
-                -- CẢM BIẾN GỠ KẸT VÀ PHÁ Ổ NHẢY MỘT CHỖ (0.2 Giây)
-                if (os.clock() - startTime) > 0.2 then
+                -- CẢM BIẾN QUÉT KẸT SIÊU NHẠY CHO MOBILE (0.12 Giây)
+                if (os.clock() - startTime) > 0.12 then
                     local movedDistance = (rootPart.Position - startPos).Magnitude
                     
-                    -- Nếu không di chuyển được đáng kể (Bị kẹt hoặc đang nhảy nhấp nhô 1 chỗ)
-                    if movedDistance < 1.2 then
-                        jumpCountThisWaypoint = jumpCountThisWaypoint + 1
+                    -- Nếu dịch chuyển ít hơn 1.4 studs (Dấu hiệu đang bị vã mặt vào tường)
+                    if movedDistance < 1.4 then
+                        -- BƯỚC 1: Ép hủy di chuyển cũ để giải phóng cần gạt ảo trên Mobile
+                        humanoid:MoveTo(rootPart.Position)
                         
-                        -- CHỐNG NHẢY HOÀI KHÔNG ĐI: Nếu đã nhảy cố quá 3 lần tại chỗ này, bỏ qua waypoint lỗi ngay lập tức
-                        if jumpCountThisWaypoint > 3 then
-                            isStuck = true
-                            break
+                        -- BƯỚC 2: Tính toán hướng giật lùi khẩn cấp để thoát cọ tường vật lý
+                        local escapeDirection = (rootPart.Position - waypoint.Position).Unit
+                        if escapeDirection.Magnitude == 0 then
+                            escapeDirection = -rootPart.CFrame.LookVector
                         end
                         
-                        local pushDirection = (waypoint.Position - rootPart.Position).Unit
+                        -- Kích hoạt nhảy và đẩy ngược nhân vật ra xa góc tường
+                        triggerSafeInfJump(humanoid)
+                        rootPart.AssemblyLinearVelocity = (escapeDirection * 20) + Vector3.new(0, 25, 0)
                         
-                        task.spawn(function()
-                            triggerSafeInfJump(humanoid)
-                        end)
+                        task.wait(0.1) -- Thời gian ngắn để tách nhân vật khỏi chân tường
                         
-                        -- Lực đẩy nhẹ về phía trước kết hợp lách góc ngẫu nhiên
-                        rootPart.AssemblyLinearVelocity = (pushDirection * (RUN_SPEED * 1.2)) + Vector3.new(0, 28, 0)
-                        humanoid:MoveTo(waypoint.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3)))
-                        task.wait(0.2)
-                        
-                        isStuck = true 
-                        break 
+                        isStuck = true
+                        break -- Bẻ gãy vòng lặp hiện tại, buộc vòng lặp chính tính toán lại Path mới
                     end
                     
                     startTime = os.clock()
@@ -163,16 +157,17 @@ local function walkPathToTarget(rootPart, humanoid, targetPart)
                 task.wait()
             end
             
-            -- Nếu phát hiện lỗi nhảy/kẹt, thoát ra để tính lại đường đi hoàn toàn mới
+            -- Nếu kẹt/cọ tường, trả về false ngay lập tức để làm mới lộ trình
             if isStuck then 
                 return false 
             end
         end
         return true
     else
-        -- Phục hồi khẩn cấp né anti-cheat khi lỗi đường đi
-        rootPart.AssemblyLinearVelocity = (-rootPart.CFrame.LookVector * 10) + Vector3.new(0, 15, 0)
-        task.wait(0.2)
+        -- Phục hồi khẩn cấp khi không tìm thấy đường đi ngắn nhất
+        local backupDir = -rootPart.CFrame.LookVector
+        rootPart.AssemblyLinearVelocity = (backupDir * 15) + Vector3.new(0, 20, 0)
+        task.wait(0.15)
         return false
     end
 end
@@ -180,7 +175,7 @@ end
 -- =========================================================================
 -- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3
 -- =========================================================================
-print("[STAGE 3] Khởi chạy luồng di chuyển thông minh ổn định - Đã chống nhảy một chỗ...");
+print("[STAGE 3] Luồng xử lý Mobile hoạt động - Chống cọ tường và đứng im thành công!");
 local reached = false
 
 while not reached do
@@ -195,6 +190,7 @@ while not reached do
             local distance = (root.Position - targetBox.Position).Magnitude
             
             if distance > 4.5 then
+                -- Hàm walkPathToTarget nếu gặp tường sẽ thoát ra ngay với giá trị false, giúp vòng lặp while chạy lại tức thì để tìm đường mới
                 walkPathToTarget(root, humanoid, targetBox)
             else
                 print("[🎯 STAGE 3 SUCCESS] Đã cập bến trạm điện dứt khoát!");
@@ -215,7 +211,7 @@ while not reached do
     else
         task.wait(0.3)
     end
-    task.wait(0.02)
+    task.wait(0.01) -- Giảm tối đa thời gian chờ vòng lặp chính để tăng tốc quét tọa độ trên Mobile
 end
 
 task.wait(0.05)
