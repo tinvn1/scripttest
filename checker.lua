@@ -3,6 +3,7 @@
 -- =========================================================================
 
 local Players = game:GetService("Players")
+local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -77,7 +78,7 @@ InfoStroke.Parent = InfoArea
 local SystemTag = Instance.new("TextLabel")
 SystemTag.Size = UDim2.new(1, -30, 0, 25)
 SystemTag.Position = UDim2.new(0, 20, 0, 15)
-SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // TOGGLE_MODE"
+SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // DATA_RECEIVER"
 SystemTag.TextColor3 = Color3.fromRGB(140, 160, 180)
 SystemTag.TextSize = 11
 SystemTag.Font = Enum.Font.Code
@@ -88,9 +89,9 @@ SystemTag.Parent = InfoArea
 local GemValueLabel = Instance.new("TextLabel")
 GemValueLabel.Size = UDim2.new(1, -30, 0, 50)
 GemValueLabel.Position = UDim2.new(0, 20, 0, 40)
-GemValueLabel.Text = "💎 Loading..."
+GemValueLabel.Text = "👤 LOADING DATA..."
 GemValueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-GemValueLabel.TextSize = 36
+GemValueLabel.TextSize = 22 -- Hạ size chữ xuống một chút để hiển thị tên đẹp hơn
 GemValueLabel.Font = Enum.Font.GothamBold
 GemValueLabel.TextXAlignment = Enum.TextXAlignment.Left
 GemValueLabel.BackgroundTransparency = 1
@@ -116,7 +117,7 @@ BarCorner.Parent = StatusBar
 local StatusText = Instance.new("TextLabel")
 StatusText.Size = UDim2.new(1, -30, 0, 20)
 StatusText.Position = UDim2.new(0, 20, 0, 105)
-StatusText.Text = "STATUS: ACTIVE // OVERLAY_CONNECTED"
+StatusText.Text = "STATUS: FETCHING READ-ONLY DATA..."
 StatusText.TextColor3 = Color3.fromRGB(0, 230, 255)
 StatusText.TextSize = 10
 StatusText.Font = Enum.Font.Code
@@ -127,10 +128,9 @@ StatusText.Parent = InfoArea
 -- =========================================================================
 -- 4. NÚT BẤM ẨN / HIỆN TẤT CẢ (TOGGLE BUTTON)
 -- =========================================================================
--- Nút bấm được đặt riêng độc lập với HubContent để nó không bị ẩn đi cùng Hub
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 80, 0, 30)
-ToggleButton.Position = UDim2.new(0, 20, 0, 40) -- Nằm ở góc trên bên trái, bên dưới thanh công cụ Roblox một chút
+ToggleButton.Position = UDim2.new(0, 20, 0, 40) 
 ToggleButton.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
 ToggleButton.Text = "ẨN HUB"
 ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
@@ -147,49 +147,44 @@ ButtonStroke.Color = Color3.fromRGB(0, 230, 255)
 ButtonStroke.Thickness = 1
 ButtonStroke.Parent = ToggleButton
 
--- Logic xử lý khi click chuột vào nút bấm
 ToggleButton.MouseButton1Click:Connect(function()
     if HubContent.Visible == true then
         HubContent.Visible = false
         ToggleButton.Text = "HIỆN HUB"
         ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ButtonStroke.Color = Color3.fromRGB(100, 100, 100) -- Đổi viền sang xám khi đóng
+        ButtonStroke.Color = Color3.fromRGB(100, 100, 100)
     else
         HubContent.Visible = true
         ToggleButton.Text = "ẨN HUB"
         ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
-        ButtonStroke.Color = Color3.fromRGB(0, 230, 255) -- Đổi viền về Neon xanh khi mở
+        ButtonStroke.Color = Color3.fromRGB(0, 230, 255)
     end
 end)
 
 -- =========================================================================
--- LOGIC ĐỒNG BỘ GEM THEO THỜI GIAN THỰC
+-- LOGIC TRÍCH XUẤT DỮ LIỆU GỐC (CHỈ ĐỌC & HIỂN THỊ)
 -- =========================================================================
-local function updateGemDisplay(text)
-    GemValueLabel.Text = "💎 " .. tostring(text)
-end
-
 task.spawn(function()
-    local mainUI = PlayerGui:WaitForChild("MainUI", 15)
-    local gemDisplay = mainUI and mainUI:WaitForChild("GemDisplay", 15)
-    local gemCountObject = gemDisplay and gemDisplay:WaitForChild("Count", 15)
-
-    while not gemCountObject do
-        pcall(function()
-            gemCountObject = PlayerGui.MainUI.GemDisplay.Count
-        end)
-        if gemCountObject then break end
-        task.wait(0.5)
-    end
-
-    if gemCountObject then
-        updateGemDisplay(gemCountObject.Text)
-        gemCountObject:GetPropertyChangedSignal("Text"):Connect(function()
-            updateGemDisplay(gemCountObject.Text)
-        end)
-        print("[🚀 SYSTEM] Đã kích hoạt Fullscreen Hub & Toggle Button!");
-    else
-        GemValueLabel.Text = "💎 ERROR";
-        GemValueLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
+    print("[🚀 SYSTEM] Đã kích hoạt Chế độ Đọc dữ liệu an toàn!");
+    
+    -- Lấy thông tin cố định từ User
+    local userName = LocalPlayer.Name
+    local accountAge = LocalPlayer.AccountAge
+    
+    while true do
+        -- Lấy chỉ số Ping hiện tại của bạn đến Server (Dữ liệu thời gian thực từ game)
+        local networkStats = Stats:FindFirstChild("Network")
+        local currentPing = 0
+        if networkStats then
+            currentPing = math.floor(networkStats:GetServerPing() * 1000)
+        end
+        
+        -- Cập nhật màn hình chính (Hiển thị tên người chơi và số ngày tuổi của tài khoản)
+        GemValueLabel.Text = string.format("👤 %s [AGE: %dD]", userName:upper(), accountAge)
+        
+        -- Cập nhật màn hình trạng thái bên dưới (Hiển thị Ping thời gian thực)
+        StatusText.Text = string.format("STATUS: ACTIVE // NETWORK PING: %dms // MONITOR: READ_ONLY", currentPing)
+        
+        task.wait(1) -- Chu kỳ quét lại dữ liệu sau mỗi giây
     end
 end)
