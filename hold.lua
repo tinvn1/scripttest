@@ -1,48 +1,34 @@
-task.wait(1)
+task.wait(3)
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
-local StarterGui = game:GetService("StarterGui")
 
--- =========================================================================
--- CẤU HÌNH VÒNG LẶP VÀ TỌA ĐỘ
--- =========================================================================
-local HOLD_DURATION = 19   -- Thời gian giữ (giây)
-local COOLDOWN_TIME = 1    -- Thời gian nghỉ giữa mỗi lần lặp (giây)
-local OFFSET_DOWN = 20     -- Độ thấp dưới tâm màn hình (pixel)
+-- Thông báo bắt đầu giữ
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Auto Hold",
+    Text = "Bắt đầu giữ tâm màn hình trong 19 giây...",
+    Duration = 3
+})
 
+-- Lấy tọa độ chính giữa màn hình điện thoại
+local centerX = Camera.ViewportSize.X / 2
+local centerY = Camera.ViewportSize.Y / 2
+
+-- Kích hoạt vòng lặp giữ trong 19 giây
+local startTime = tick()
 task.spawn(function()
-    while true do
-        pcall(function()
-            -- Lấy lại tọa độ mỗi vòng lặp phòng trường hợp bạn xoay màn hình điện thoại
-            local centerX = Camera.ViewportSize.X / 2
-            local exactCenterY = Camera.ViewportSize.Y / 2
-            local centerY = exactCenterY + OFFSET_DOWN
-
-            -- Thông báo bắt đầu lượt giữ mới
-            StarterGui:SetCore("SendNotification", {
-                Title = "Auto Hold Loop",
-                Text = "Đang giữ tâm dưới... (" .. HOLD_DURATION .. "s)",
-                Duration = 2
-            })
-
-            -- [BƯỚC 1]: BẮT ĐẦU GIỮ (Gửi lệnh 'true')
-            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-
-            -- [BƯỚC 2]: Chờ hết thời gian hold
-            task.wait(HOLD_DURATION)
-
-            -- [BƯỚC 3]: THẢ RA (Gửi lệnh 'false')
-            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
-
-            -- Thông báo hoàn thành lượt
-            StarterGui:SetCore("SendNotification", {
-                Title = "Auto Hold Loop",
-                Text = "Đã thả! Nghỉ " .. COOLDOWN_TIME .. "s trước lượt tiếp theo.",
-                Duration = 2
-            })
-        end)
-        
-        -- Thời gian nghỉ trước khi bắt đầu vòng lặp mới
-        task.wait(COOLDOWN_TIME)
+    while tick() - startTime < 19 do
+        -- Giả lập hành động nhấn xuống (true) tại tâm màn hình
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+        task.wait(0.1) -- Duy trì lệnh nhấn liên tục để tránh bị tuột
     end
+    
+    -- Sau 19 giây, thực hiện nhấc ra (false)
+    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+    
+    -- Thông báo hoàn thành
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Auto Hold",
+        Text = "Đã giữ đủ 19 giây và tự động thả!",
+        Duration = 3
+    })
 end)
