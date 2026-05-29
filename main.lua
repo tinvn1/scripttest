@@ -100,6 +100,10 @@ task.spawn(function()
     -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
     runFile("AutoEquip.lua ") 
 end)
+task.spawn(function()
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("checker.lua") 
+end)
 -- =========================================================================
 -- 🔄 HỆ THỐNG VẬN HÀNH TUẦN TỰ QUA CÁC STAGE GỐC (CHỐNG LỖI LOGIC)
 -- =========================================================================
