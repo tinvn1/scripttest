@@ -1,168 +1,174 @@
 -- =========================================================================
--- 🍊 ORANGE STATS CHECKER - ĐOẠN MẠCH RIÊNG BIỆT (CÓ CẬP NHẬT STATUS MAIN)
+-- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (GITHUB EXTERNAL IMAGE VERSION)
 -- =========================================================================
 
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local localPlayer = Players.LocalPlayer
-local playerGui = localPlayer:WaitForChild("PlayerGui")
+-- Đường dẫn link ảnh RAW trực tiếp từ kho lưu trữ GitHub của bạn
+local GitHub_Image_URL = "https://raw.githubusercontent.com/tinvn1/scripttest/main/anhnen.jpg"
+local Local_File_Name = "tinvn_hub_background.jpg"
+local Asset_ID = ""
 
--- Xóa Gui cũ nếu có trùng lặp
-if playerGui:FindFirstChild("OrangeCheckerGui") then playerGui.OrangeCheckerGui:Destroy() end
-if Lighting:FindFirstChild("OrangeCheckerBlur") then Lighting.OrangeCheckerBlur:Destroy() end
+-- [XỬ LÝ TẢI ẢNH NGOÀI ROBLOX] 
+-- Kiểm tra xem Executor của bạn có hỗ trợ tải file internet hay không
+local success, err = pcall(function()
+    if writefile and readfile and getcustomasset and syn then
+        -- Tải dữ liệu ảnh từ GitHub và lưu tạm vào thư mục workspace của Executor
+        if not isfile(Local_File_Name) then
+            writefile(Local_File_Name, game:HttpGet(GitHub_Image_URL))
+        end
+        -- Chuyển đổi file vừa tải thành định dạng tài nguyên mà Roblox đọc được
+        Asset_ID = getcustomasset(Local_File_Name)
+    elseif writefile and readfile and getcustomasset then -- Cho các bản Exploit tiêu chuẩn khác
+        if not isfile(Local_File_Name) then
+            writefile(Local_File_Name, game:HttpGet(GitHub_Image_URL))
+        end
+        Asset_ID = getcustomasset(Local_File_Name)
+    else
+        -- Nếu Executor không hỗ trợ, tự động dùng lại ID dự phòng trên hệ thống Roblox
+        Asset_ID = "rbxassetid://16441589139" 
+    end
+end)
 
--- 1. Khởi tạo Giao diện (Mờ nền + Khung Cam)
+if not success or Asset_ID == "" then
+    Asset_ID = "rbxassetid://16441589139" -- ID dự phòng nếu lỗi tải file
+end
+
+-- 1. TẠO KHUNG CHÍNH TRÀN MÀN HÌNH (FULLSCREEN HUB)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "OrangeCheckerGui"
+ScreenGui.Name = "Gemini_UltimateExternalHub"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = playerGui
+ScreenGui.IgnoreGuiInset = true -- Bỏ qua thanh công cụ của Roblox để tràn viền hoàn toàn
+ScreenGui.Parent = PlayerGui
 
-local Background = Instance.new("Frame")
-Background.Size = UDim2.new(1, 0, 1, 0)
-Background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Background.BackgroundTransparency = 1
-Background.BorderSizePixel = 0
-Background.Parent = ScreenGui
-
-local Blur = Instance.new("BlurEffect")
-Blur.Name = "OrangeCheckerBlur"
-Blur.Size = 0
-Blur.Parent = Lighting
-
+-- Khung nền bao phủ toàn bộ màn hình
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 0, 0, 0)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 13)
-MainFrame.BackgroundTransparency = 0.15
+MainFrame.Size = UDim2.new(1, 0, 1, 0)
+MainFrame.Position = UDim2.new(0, 0, 0, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 18)
 MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
+MainFrame.Active = true
 MainFrame.Parent = ScreenGui
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(255, 120, 0)
-UIStroke.Thickness = 2
-UIStroke.Parent = MainFrame
+-- 2. HÌNH NỀN FULLSCREEN (Sử dụng asset vừa tải từ GitHub về)
+local AnimeBackground = Instance.new("ImageLabel")
+AnimeBackground.Size = UDim2.new(1, 0, 1, 0)
+AnimeBackground.Position = UDim2.new(0, 0, 0, 0)
+AnimeBackground.Image = Asset_ID -- Gán link ảnh ngoài đã chuyển đổi ở đây
+AnimeBackground.ScaleType = Enum.ScaleType.Crop -- Tự động co giãn chuẩn tỉ lệ mọi màn hình
+AnimeBackground.Parent = MainFrame
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
+-- Lớp phủ tối (Overlay) giúp làm dịu ảnh nền, làm nổi bật các thông số hiển thị
+local DarkOverlay = Instance.new("Frame")
+DarkOverlay.Size = UDim2.new(1, 0, 1, 0)
+DarkOverlay.BackgroundColor3 = Color3.fromRGB(10, 14, 18)
+DarkOverlay.BackgroundTransparency = 0.4
+DarkOverlay.BorderSizePixel = 0
+DarkOverlay.Parent = MainFrame
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.BackgroundTransparency = 1
-Title.Text = "Orange Stats Checker"
-Title.TextColor3 = Color3.fromRGB(255, 120, 0)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
-Title.Parent = MainFrame
+-- 3. TRUNG TÂM ĐIỀU KHIỂN & THEO DÕI THÔNG SỐ (CENTER PANEL)
+local InfoArea = Instance.new("Frame")
+InfoArea.Size = UDim2.new(0, 400, 0, 150)
+InfoArea.Position = UDim2.new(0.5, -200, 0.75, -75) -- Đặt ở nửa dưới màn hình để không che mặt nhân vật
+InfoArea.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
+InfoArea.BackgroundTransparency = 0.25 -- Hiệu ứng kính mờ Cyberpunk
+InfoArea.BorderSizePixel = 0
+InfoArea.Parent = MainFrame
 
-local Divider = Instance.new("Frame")
-Divider.Size = UDim2.new(0.85, 0, 0, 1)
-Divider.Position = UDim2.new(0.075, 0, 0, 45)
-Divider.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-Divider.BorderSizePixel = 0
-Divider.Parent = MainFrame
+local InfoCorner = Instance.new("UICorner")
+InfoCorner.CornerRadius = UDim.new(0, 12)
+InfoCorner.Parent = InfoArea
 
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, -40, 1, -65)
-Content.Position = UDim2.new(0, 20, 0, 55)
-Content.BackgroundTransparency = 1
-Content.Parent = MainFrame
+local InfoStroke = Instance.new("UIStroke")
+InfoStroke.Color = Color3.fromRGB(0, 230, 255)
+InfoStroke.Thickness = 1.5
+InfoStroke.Parent = InfoArea
 
--- 2. Đổ dữ liệu tĩnh lên bảng (Giống trong ảnh của bạn)
-local function addStatLabel(text, posY, isHeader)
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 23)
-    label.Position = UDim2.new(0, 0, 0, posY)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.Font = isHeader and Enum.Font.GothamBold or Enum.Font.GothamMedium
-    label.TextSize = isHeader and 14 or 13
-    label.TextColor3 = isHeader and Color3.fromRGB(255, 120, 0) or Color3.fromRGB(220, 220, 220)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = Content
-    return label
-end
+-- Tiêu đề hệ thống
+local SystemTag = Instance.new("TextLabel")
+SystemTag.Size = UDim2.new(1, -30, 0, 25)
+SystemTag.Position = UDim2.new(0, 20, 0, 15)
+SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // EXT_IMAGE_MODE"
+SystemTag.TextColor3 = Color3.fromRGB(140, 160, 180)
+SystemTag.TextSize = 11
+SystemTag.Font = Enum.Font.Code
+SystemTag.TextXAlignment = Enum.TextXAlignment.Left
+SystemTag.BackgroundTransparency = 1
+SystemTag.Parent = InfoArea
 
-addStatLabel("Account Stats", 0, true)
-addStatLabel("Level: 2601   Third Sea : ✅", 25)
-addStatLabel("Race: Fishman", 45)
-addStatLabel("Beli: 347.5K", 65)
-addStatLabel("Frag: 6632", 85)
+-- Ô hiển thị lượng Gem số lớn
+local GemValueLabel = Instance.new("TextLabel")
+GemValueLabel.Size = UDim2.new(1, -30, 0, 50)
+GemValueLabel.Position = UDim2.new(0, 20, 0, 40)
+GemValueLabel.Text = "💎 Loading..."
+GemValueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+GemValueLabel.TextSize = 36
+GemValueLabel.Font = Enum.Font.GothamBold
+GemValueLabel.TextXAlignment = Enum.TextXAlignment.Left
+GemValueLabel.BackgroundTransparency = 1
+GemValueLabel.Parent = InfoArea
+
+local TextStroke = Instance.new("UIStroke")
+TextStroke.Color = Color3.fromRGB(0, 230, 255)
+TextStroke.Thickness = 0.5
+TextStroke.Transparency = 0.5
+TextStroke.Parent = GemValueLabel
+
+-- Thanh trạng thái Neon trang trí
+local StatusBar = Instance.new("Frame")
+StatusBar.Size = UDim2.new(1, -40, 0, 3)
+StatusBar.Position = UDim2.new(0, 20, 0, 95)
+StatusBar.BackgroundColor3 = Color3.fromRGB(0, 230, 255)
+StatusBar.BorderSizePixel = 0
+StatusBar.Parent = InfoArea
+
+local BarCorner = Instance.new("UICorner")
+BarCorner.CornerRadius = UDim.new(0, 2)
+BarCorner.Parent = StatusBar
+
+-- Dòng chữ trạng thái kết nối
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(1, -30, 0, 20)
+StatusText.Position = UDim2.new(0, 20, 0, 105)
+StatusText.Text = "STATUS: ACTIVE // OVERLAY_CONNECTED"
+StatusText.TextColor3 = Color3.fromRGB(0, 230, 255)
+StatusText.TextSize = 10
+StatusText.Font = Enum.Font.Code
+StatusText.TextXAlignment = Enum.TextXAlignment.Left
+StatusText.BackgroundTransparency = 1
+StatusText.Parent = InfoArea
 
 -- =========================================================================
--- 🛠️ KHU VỰC ĐỘNG: THEO DÕI TRẠNG THÁI SCRIPT MAIN (SCRIPT STATUS)
+-- LOGIC KIỂM TRA VÀ ĐỒNG BỘ GEM THEO THỜI GIAN THỰC
 -- =========================================================================
-local StatusHeader = addStatLabel("Script Status", 115, true)
-local MainStatusLabel = addStatLabel("Đang đợi Script Main kết nối...", 140)
-MainStatusLabel.TextColor3 = Color3.fromRGB(255, 235, 59) -- Chữ màu vàng cảnh báo ban đầu
 
-local TimerLabel = addStatLabel("Thời gian chạy: 0s | Đếm ngược Rejoin: 120s", 160)
-TimerLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
-
--- Chấm đỏ item phía dưới cùng
-local function addStatusItem(text, posX, posY)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(0, 140, 0, 25)
-    container.Position = UDim2.new(0, posX, 0, posY)
-    container.BackgroundTransparency = 1
-    container.Parent = Content
-    
-    local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0, 8, 0, 8)
-    dot.Position = UDim2.new(0, 0, 0.5, -4)
-    dot.BackgroundColor3 = Color3.fromRGB(255, 45, 45)
-    dot.BorderSizePixel = 0
-    dot.Parent = container
-    local dc = Instance.new("UICorner") dc.CornerRadius = UDim.new(1,0) dc.Parent = dot
-
-    local il = Instance.new("TextLabel")
-    il.Size = UDim2.new(1, -15, 1, 0)
-    il.Position = UDim2.new(0, 15, 0, 0)
-    il.BackgroundTransparency = 1
-    il.Text = text
-    il.TextColor3 = Color3.fromRGB(200, 200, 200)
-    il.Font = Enum.Font.GothamMedium
-    il.TextSize = 12
-    il.TextXAlignment = Enum.TextXAlignment.Left
-    il.Parent = container
+local function updateGemDisplay(text)
+    GemValueLabel.Text = "💎 " .. tostring(text)
 end
 
-addStatusItem("GodHuman", 0, 200)
-addStatusItem("Skull Guitar", 0, 230)
-addStatusItem("Curse Dual Katana", 150, 200)
-addStatusItem("Mirror Fractal", 150, 230)
-addStatusItem("Valkyrie Helm", 310, 200)
-addStatusItem("Pull Lever", 310, 230)
-
--- Hiệu ứng mở bảng mượt
-local tInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-TweenService:Create(Background, tInfo, {BackgroundTransparency = 0.55}):Play()
-TweenService:Create(Blur, tInfo, {Size = 18}):Play()
-TweenService:Create(MainFrame, tInfo, { Size = UDim2.new(0, 500, 0, 360), Position = UDim2.new(0.5, -250, 0.5, -180) }):Play()
-
--- 🔄 VÒNG LẶP LIÊN TỤC CẬP NHẬT TRẠNG THÁI TỪ SCRIPT MAIN
 task.spawn(function()
-    while true do
-        -- Lấy dữ liệu từ biến toàn cục _G được truyền từ script main sang
-        if _G.MainScriptStatus then
-            MainStatusLabel.Text = "Trạng thái: " .. tostring(_G.MainScriptStatus)
-            MainStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 127) -- Đổi sang màu xanh khi hoạt động ổn
-        end
-        
-        if _G.MainScriptTimeElapsed then
-            local elapsed = math.floor(_G.MainScriptTimeElapsed)
-            local timeLeft = math.max(0, 120 - elapsed)
-            TimerLabel.Text = string.format("Thời gian chạy: %ds | Đếm ngược Rejoin: %ds", elapsed, timeLeft)
-            
-            if timeLeft <= 10 then
-                TimerLabel.TextColor3 = Color3.fromRGB(255, 75, 75) -- Chuyển đỏ nếu sắp bị ép Rejoin
-            end
-        end
-        task.wait(0.2) -- Cập nhật mượt mà 5 lần/giây
+    local mainUI = PlayerGui:WaitForChild("MainUI", 15)
+    local gemDisplay = mainUI and mainUI:WaitForChild("GemDisplay", 15)
+    local gemCountObject = gemDisplay and gemDisplay:WaitForChild("Count", 15)
+
+    while not gemCountObject do
+        pcall(function()
+            gemCountObject = PlayerGui.MainUI.GemDisplay.Count
+        end)
+        if gemCountObject then break end
+        task.wait(0.5)
+    end
+
+    if gemCountObject then
+        updateGemDisplay(gemCountObject.Text)
+        gemCountObject:GetPropertyChangedSignal("Text"):Connect(function()
+            updateGemDisplay(gemCountObject.Text)
+        end)
+        print("[🚀 SYSTEM] Đã kích hoạt Fullscreen Hub bằng ảnh GitHub thành công!");
+    else
+        GemValueLabel.Text = "💎 ERROR";
+        GemValueLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
     end
 end)
