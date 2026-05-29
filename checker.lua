@@ -3,7 +3,6 @@
 -- =========================================================================
 
 local Players = game:GetService("Players")
-local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -78,7 +77,7 @@ InfoStroke.Parent = InfoArea
 local SystemTag = Instance.new("TextLabel")
 SystemTag.Size = UDim2.new(1, -30, 0, 25)
 SystemTag.Position = UDim2.new(0, 20, 0, 15)
-SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // DATA_RECEIVER"
+SystemTag.Text = "♦ ENDFIELD MONITOR SYSTEM // LIVE_GEM_DATA"
 SystemTag.TextColor3 = Color3.fromRGB(140, 160, 180)
 SystemTag.TextSize = 11
 SystemTag.Font = Enum.Font.Code
@@ -89,9 +88,9 @@ SystemTag.Parent = InfoArea
 local GemValueLabel = Instance.new("TextLabel")
 GemValueLabel.Size = UDim2.new(1, -30, 0, 50)
 GemValueLabel.Position = UDim2.new(0, 20, 0, 40)
-GemValueLabel.Text = "👤 LOADING DATA..."
+GemValueLabel.Text = "💎 Loading..."
 GemValueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-GemValueLabel.TextSize = 22 -- Hạ size chữ xuống một chút để hiển thị tên đẹp hơn
+GemValueLabel.TextSize = 36
 GemValueLabel.Font = Enum.Font.GothamBold
 GemValueLabel.TextXAlignment = Enum.TextXAlignment.Left
 GemValueLabel.BackgroundTransparency = 1
@@ -117,7 +116,7 @@ BarCorner.Parent = StatusBar
 local StatusText = Instance.new("TextLabel")
 StatusText.Size = UDim2.new(1, -30, 0, 20)
 StatusText.Position = UDim2.new(0, 20, 0, 105)
-StatusText.Text = "STATUS: FETCHING READ-ONLY DATA..."
+StatusText.Text = "STATUS: INITIALIZING GAME LINK..."
 StatusText.TextColor3 = Color3.fromRGB(0, 230, 255)
 StatusText.TextSize = 10
 StatusText.Font = Enum.Font.Code
@@ -162,29 +161,42 @@ ToggleButton.MouseButton1Click:Connect(function()
 end)
 
 -- =========================================================================
--- LOGIC TRÍCH XUẤT DỮ LIỆU GỐC (CHỈ ĐỌC & HIỂN THỊ)
+-- LOGIC ĐỒNG BỘ GEM GỐC (CHỈ ĐỌC DỮ LIỆU TỪ GAME)
 -- =========================================================================
+local function updateGemDisplay(text)
+    GemValueLabel.Text = "💎 " .. tostring(text)
+end
+
 task.spawn(function()
-    print("[🚀 SYSTEM] Đã kích hoạt Chế độ Đọc dữ liệu an toàn!");
-    
-    -- Lấy thông tin cố định từ User
-    local userName = LocalPlayer.Name
-    local accountAge = LocalPlayer.AccountAge
-    
-    while true do
-        -- Lấy chỉ số Ping hiện tại của bạn đến Server (Dữ liệu thời gian thực từ game)
-        local networkStats = Stats:FindFirstChild("Network")
-        local currentPing = 0
-        if networkStats then
-            currentPing = math.floor(networkStats:GetServerPing() * 1000)
-        end
+    -- Hệ thống đợi tìm UI chứa chỉ số Gem của game (Tối đa 15 giây)
+    local mainUI = PlayerGui:WaitForChild("MainUI", 15)
+    local gemDisplay = mainUI and mainUI:WaitForChild("GemDisplay", 15)
+    local gemCountObject = gemDisplay and gemDisplay:WaitForChild("Count", 15)
+
+    -- Vòng lặp quét dự phòng nếu game tải UI chậm
+    while not gemCountObject do
+        pcall(function()
+            gemCountObject = PlayerGui.MainUI.GemDisplay.Count
+        end)
+        if gemCountObject then break end
+        task.wait(0.5)
+    end
+
+    -- Nếu tìm thấy đúng đối tượng chứa dữ liệu Gem
+    if gemCountObject then
+        -- Cập nhật dữ liệu hiện tại ngay lập tức
+        updateGemDisplay(gemCountObject.Text)
+        StatusText.Text = "STATUS: ACTIVE // LIVE_DATA_CONNECTED"
         
-        -- Cập nhật màn hình chính (Hiển thị tên người chơi và số ngày tuổi của tài khoản)
-        GemValueLabel.Text = string.format("👤 %s [AGE: %dD]", userName:upper(), accountAge)
-        
-        -- Cập nhật màn hình trạng thái bên dưới (Hiển thị Ping thời gian thực)
-        StatusText.Text = string.format("STATUS: ACTIVE // NETWORK PING: %dms // MONITOR: READ_ONLY", currentPing)
-        
-        task.wait(1) -- Chu kỳ quét lại dữ liệu sau mỗi giây
+        -- Lắng nghe sự thay đổi: Mỗi khi game thay đổi số Gem, Hub tự cập nhật theo (Chỉ đọc)
+        gemCountObject:GetPropertyChangedSignal("Text"):Connect(function()
+            updateGemDisplay(gemCountObject.Text)
+        end)
+        print("[🚀 SYSTEM] Đã kết nối thành công dữ liệu Gem thực tế!");
+    else
+        -- Trường hợp không tìm thấy UI (Ví dụ: Sai game hoặc UI đã thay đổi cấu trúc)
+        GemValueLabel.Text = "💎 NOT FOUND";
+        GemValueLabel.TextColor3 = Color3.fromRGB(255, 70, 70)
+        StatusText.Text = "STATUS: ERROR // CANNOT_LINK_GEM_DATA"
     end
 end)
