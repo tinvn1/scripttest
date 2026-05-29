@@ -93,7 +93,11 @@ task.spawn(function()
     -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
     runFile("camera") 
 end)
--- =========================================================================
+-- =====
+task.spawn(function()
+    -- Tự động gọi file Stage 0 xử lý ZHUB riêng biệt từ xa
+    runFile("checker.lua") 
+end)====================================================================
 -- ⚔️ LUỒNG TỰ ĐỘNG CẦM VŨ KHÍ SONG SONG
 -- =========================================================================
 task.spawn(function()
