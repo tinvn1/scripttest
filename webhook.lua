@@ -1,5 +1,5 @@
 -- =========================================================================
--- 🚀 DISCORD WEBHOOK LOG INDEPENDENT (WEBHOOK.LUA)
+-- DISCORD WEBHOOK LOG INDEPENDENT (WEBHOOK.LUA)
 -- =========================================================================
 local request = http_request or request or syn.request
 if request then
@@ -38,21 +38,21 @@ if request then
 
         local payload = {
             ["embeds"] = {{
-                ["title"] = "💎 THÔNG BÁO SỐ LƯỢNG GEM",
+                ["title"] = "THÔNG BÁO SỐ LƯỢNG GEM",
                 ["color"] = 65430,
                 ["fields"] = {
                     {
-                        ["name"] = "👤 Tên nhân vật:",
+                        ["name"] = "Ten nhan vat:",
                         ["value"] = "`" .. localPlayer.Name .. "`",
                         ["inline"] = true
                     },
                     {
-                        ["name"] = "💎 Số lượng Gem hiện tại:",
+                        ["name"] = "So luong Gem hien tai:",
                         ["value"] = "**" .. tostring(currentGem) .. "**",
                         ["inline"] = true
                     },
                     {
-                        ["name"] = "🎮 Game ID:",
+                        ["name"] = "Game ID:",
                         ["value"] = "`" .. tostring(game.PlaceId) .. "`",
                         ["inline"] = true
                     }
@@ -68,7 +68,7 @@ if request then
                 Headers = {["content-type"] = "application/json"},
                 Body = game:GetService("HttpService"):JSONEncode(payload)
             })
-            print("[🚀 SYSTEM] Webhook độc lập đã tự kêu thành công!");
+            print("[SYSTEM] Webhook da tu keu thanh cong!")
         end)
     end)
 end
