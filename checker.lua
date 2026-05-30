@@ -1,5 +1,5 @@
 -- =========================================================================
--- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (WITH TOGGLE BUTTON)
+-- 💎 ULTIMATE SCI-FI FULLSCREEN HUB (WITHOUT TOGGLE BUTTON)
 -- =========================================================================
 
 local Players = game:GetService("Players")
@@ -34,12 +34,12 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true -- Tràn viền hoàn toàn
 ScreenGui.Parent = PlayerGui
 
--- Khung chứa toàn bộ nội dung Hub (Dùng để ẩn/hiện hàng loạt)
+-- Khung chứa toàn bộ nội dung Hub
 local HubContent = Instance.new("Frame")
 HubContent.Size = UDim2.new(1, 0, 1, 0)
 HubContent.BackgroundTransparency = 1
 HubContent.BorderSizePixel = 0
-HubContent.Visible = true -- Trạng thái mặc định là hiển thị
+HubContent.Visible = true -- Luôn luôn hiển thị
 HubContent.Parent = ScreenGui
 
 -- 2. HÌNH NỀN FULLSCREEN
@@ -123,42 +123,6 @@ StatusText.Font = Enum.Font.Code
 StatusText.TextXAlignment = Enum.TextXAlignment.Left
 StatusText.BackgroundTransparency = 1
 StatusText.Parent = InfoArea
-
--- =========================================================================
--- 4. NÚT BẤM ẨN / HIỆN TẤT CẢ (TOGGLE BUTTON)
--- =========================================================================
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 80, 0, 30)
-ToggleButton.Position = UDim2.new(0, 20, 0, 40) 
-ToggleButton.BackgroundColor3 = Color3.fromRGB(15, 22, 28)
-ToggleButton.Text = "ẨN HUB"
-ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
-ToggleButton.TextSize = 12
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = ScreenGui
-
-local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(0, 6)
-ButtonCorner.Parent = ToggleButton
-
-local ButtonStroke = Instance.new("UIStroke")
-ButtonStroke.Color = Color3.fromRGB(0, 230, 255)
-ButtonStroke.Thickness = 1
-ButtonStroke.Parent = ToggleButton
-
-ToggleButton.MouseButton1Click:Connect(function()
-    if HubContent.Visible == true then
-        HubContent.Visible = false
-        ToggleButton.Text = "HIỆN HUB"
-        ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ButtonStroke.Color = Color3.fromRGB(100, 100, 100)
-    else
-        HubContent.Visible = true
-        ToggleButton.Text = "ẨN HUB"
-        ToggleButton.TextColor3 = Color3.fromRGB(0, 230, 255)
-        ButtonStroke.Color = Color3.fromRGB(0, 230, 255)
-    end
-end)
 
 -- =========================================================================
 -- LOGIC ĐỒNG BỘ GEM GỐC (CHỈ ĐỌC DỮ LIỆU TỪ GAME)
