@@ -53,12 +53,11 @@ if request then
                 ["color"] = 65430, -- Màu xanh Neon
                 ["fields"] = {
                     {
-{
     ["name"] = "👤 Tên nhân vật:",
-    -- Đặt || bên ngoài cặp dấu nháy để Discord hiểu đó là lệnh ẩn
-    ["value"] = "||`" .. localPlayer.Name .. "`||", 
+    -- Thêm || ở đầu và cuối để tạo hiệu ứng ẩn chữ trên Discord
+    ["value"] = "||`" .. localPlayer.Name .. "`||",
     ["inline"] = true
-}
+},
 
                     {
                         ["name"] = "💎 Số lượng Gem hiện tại:",
