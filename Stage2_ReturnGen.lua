@@ -1,5 +1,5 @@
 -- =========================================================================
--- [NEW MECHANICAL] STAGE 2: BÒ XUYÊN TƯỜNG QUAY VỀ MÁY PHÁT ĐIỆN (GENERATOR)
+-- [CƠ CHẾ MỚI] STAGE 2: BÒ XUYÊN TƯỜNG (CAO 3.5M) & TỰ ĐỘNG NẠP FUEL VÀO GEN
 -- =========================================================================
 
 local Workspace = game:GetService("Workspace")
@@ -8,25 +8,22 @@ local RunService = game:GetService("RunService")
 
 local localPlayer = Players.LocalPlayer
 local MapFolder = Workspace:FindFirstChild("Map")
-local PermanentNoclipEnabled = true
-local cachedGeneratorLocation = nil
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- --- BACKGROUND SERVICE: PERMANENT NOCLIP ENGINE (MỚI) ---
+local PermanentNoclipEnabled = true
+
+-- --- HỆ THỐNG NOCLIP ĐI XUYÊN VẬT CẢN ---
 local function StartPermanentNoclip()
     local noclipConnection = nil
     local function ConnectNoclip()
         if noclipConnection then noclipConnection:Disconnect() end
         noclipConnection = RunService.Stepped:Connect(function()
-            if not PermanentNoclipEnabled then
-                if noclipConnection then noclipConnection:Disconnect() end
-                return
-            end
+            if not PermanentNoclipEnabled then return end
             local char = localPlayer.Character
             if char then
                 for _, child in ipairs(char:GetDescendants()) do
-                    if child:IsA("BasePart") and child.CanCollide then
-                        child.CanCollide = false
-                    end
+                    if child:IsA("BasePart") and child.CanCollide then child.CanCollide = false end
                 end
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
@@ -38,9 +35,10 @@ local function StartPermanentNoclip()
 end
 StartPermanentNoclip()
 
--- --- THUẬT TOÁN DI CHUYỂN XUYÊN TƯỜNG (ADAPTIVE CRAWL) ---
+-- --- THUẬT TOÁN BÒ XUYÊN TƯỜNG KHÓA CAO 3.5M ---
 local function adaptiveCrawlTo(targetPos, hrp, char)
-    local finalTarget = targetPos + Vector3.new(0, 3, 0)
+    -- [NÂNG CAO] Khóa độ cao đích đến cao hơn gốc 3.5m tránh lọt sàn
+    local finalTarget = targetPos + Vector3.new(0, 3.5, 0) 
     local FAST_SPEED, SLOW_SPEED, STEP_DISTANCE = 35, 10, 0.25
     local CLEARANCE_COOLDOWN, lastWallDetectedTime = 0.5, 0
     local lockedYHeight = hrp.Position.Y
@@ -73,66 +71,51 @@ local function adaptiveCrawlTo(targetPos, hrp, char)
         local activeStepDistance = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and 1.4 or 0.25
         local currentAllowedSpeed = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and FAST_SPEED or SLOW_SPEED
         local delayInterval = activeStepDistance / currentAllowedSpeed
-        local nextPosition = currentPos + (direction * activeStepDistance)
-        local flattenedPosition = Vector3.new(nextPosition.X, lockedYHeight, nextPosition.Z)
+        local flattenedPosition = Vector3.new((currentPos + (direction * activeStepDistance)).X, lockedYHeight, (currentPos + (direction * activeStepDistance)).Z)
  
         hrp.CFrame = CFrame.new(flattenedPosition)
         task.wait(delayInterval)
     end
 end
 
--- --- HÀM ĐỊNH VỊ MÁY PHÁT ĐIỆN (GENERATOR) ---
-local function getGeneratorPosition()
-    if cachedGeneratorLocation then return cachedGeneratorLocation end
+-- --- HÀM QUÉT MÁY PHÁT ĐIỆN (GENERATOR) ---
+local function getGeneratorInstance()
     if MapFolder and MapFolder:FindFirstChild("Tiles") then
         for _, child in ipairs(MapFolder.Tiles:GetChildren()) do
             if child.Name == "Generator" or child:FindFirstChild("Generator") then
-                cachedGeneratorLocation = child:GetPivot().Position
-                return cachedGeneratorLocation
+                return child:FindFirstChild("Generator") or child
             end
         end
     end
-    -- Quét khẩn cấp toàn bộ Workspace nếu cấu hình map thay đổi
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj.Name == "Generator" or obj.Name == "Gen" or obj.Name == "MainGen" then
-            local part = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-            if part then
-                cachedGeneratorLocation = part.Position
-                return cachedGeneratorLocation
-            end
-        end
+        if obj.Name == "Generator" or obj.Name == "Gen" then return obj end
     end
     return nil
 end
 
--- =========================================================================
--- VÒNG LẶP ĐIỀU KHIỂN CHÍNH STAGE 2
--- =========================================================================
-print("[STAGE 2] Đang quét vị trí máy phát điện...");
-
-local char = localPlayer.Character
-local root = char and char:FindFirstChild("HumanoidRootPart")
+-- --- MAIN CHẠY STAGE 2 ---
+print("[STAGE 2] Đang di chuyển về Máy phát điện...");
+local root = character:FindFirstChild("HumanoidRootPart")
 
 if root then
-    local genPos = getGeneratorPosition()
-    
-    if genPos then
-        local distance = (root.Position - genPos).Magnitude
-        if distance > 4 then
-            print("[STAGE 2] Đang di chuyển xuyên tường tới Máy Phát Điện...")
-            adaptiveCrawlTo(genPos, root, char)
+    local generatorObj = getGeneratorInstance()
+    if generatorObj then
+        local genPart = generatorObj:IsA("BasePart") and generatorObj or generatorObj.PrimaryPart or generatorObj:FindFirstChildWhichIsA("BasePart")
+        if genPart then
+            adaptiveCrawlTo(genPart.Position, root, character)
+            
+            -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY (NẠP NHIÊN LIỆU)
+            local prompt = generatorObj:FindFirstChildOfClass("ProximityPrompt") or genPart:FindFirstChildOfClass("ProximityPrompt")
+            if prompt then 
+                fireproximityprompt(prompt)
+                print("[🎯 STAGE 2 SUCCESS] Đã tự nạp nhiên liệu máy!")
+                task.wait(1)
+            end
+            
+            _G.CurrentStage = 3
+            return true
         end
-        
-        print("[🎯 STAGE 2 SUCCESS] Đã đến vị trí máy phát điện. Chuyển sang STAGE 3!")
-        task.wait(0.3)
-        _G.CurrentStage = 3
-        return true
-    else
-        warn("[⚠️ STAGE 2 ERROR] Không tìm thấy máy phát điện! Quay lại Stage 1...")
-        _G.CurrentStage = 1
-        return false
     end
-else
-    warn("[⚠️ STAGE 2 ERROR] Không tìm thấy HumanoidRootPart!")
-    return false
 end
+_G.CurrentStage = 1
+return false
