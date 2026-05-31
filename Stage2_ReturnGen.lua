@@ -1,6 +1,6 @@
 -- =========================================================================
--- [CƠ CHẾ MỚI] STAGE 2: BÒ XUYÊN TƯỜNG (CAO 3.5M) & TỰ ĐỘNG NẠP FUEL VÀO GEN
--- (ĐÃ LOẠI BỎ HOÀN TOÀN BƯỚC CHECK KHOẢNG CÁCH MÁY)
+-- [CƠ CHẾ MỚI] STAGE 2: BÒ XUYÊN TƯỜNG (CAO 3.5M) ĐẾN THẲNG TÂM GENERATOR
+-- (ĐÃ BỎ CHECK KHOẢNG CÁCH VÀ BỎ HOÀN TOÀN PHẦN TỰ ĐỘNG NẠP FUEL)
 -- =========================================================================
 
 local Workspace = game:GetService("Workspace")
@@ -95,9 +95,9 @@ local function getGeneratorInstance()
 end
 
 -- =========================================================================
--- LUỒNG THỰC THI CHÍNH CỦA STAGE 2 (ĐÃ BỎ PHẦN CHECK MÁY)
+-- LUỒNG THỰC THI CHÍNH CỦA STAGE 2 (CHỈ DI CHUYỂN ĐẾN ĐÍCH)
 -- =========================================================================
-print("[STAGE 2] Thực thi di chuyển xuyên tường nâng cao về phía máy phát điện...");
+print("[STAGE 2] Thực thi di chuyển xuyên tường nâng cao thẳng tới tâm Generator...");
 local root = character:FindFirstChild("HumanoidRootPart")
 
 if root then
@@ -105,18 +105,12 @@ if root then
     if generatorObj then
         local genPart = generatorObj:IsA("BasePart") and generatorObj or generatorObj.PrimaryPart or generatorObj:FindFirstChildWhichIsA("BasePart")
         if genPart then
-            -- Bỏ qua bước so sánh khoảng cách cũ, lao thẳng trực tiếp đến đích
-            print("[STAGE 2] Tiến thẳng xuyên vật cản đến tâm Generator...")
+            -- Lao thẳng trực tiếp xuyên qua mọi vật cản đến vùng đích
             adaptiveCrawlTo(genPart.Position, root, character)
             
-            -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY KHÔNG CẦN CHỜ CHECK
-            print("[STAGE 2] Đã chạm vùng đích, kích hoạt nạp Fuel...")
-            local prompt = generatorObj:FindFirstChildOfClass("ProximityPrompt") or genPart:FindFirstChildOfClass("ProximityPrompt")
-            if prompt then 
-                fireproximityprompt(prompt)
-                print("[🎯 STAGE 2 SUCCESS] Đã tự nạp nhiên liệu thành công!")
-                task.wait(1)
-            end
+            -- Chạm vùng đích thành công, dừng lại ổn định và chuyển Stage tiếp theo
+            print("[🎯 STAGE 2 SUCCESS] Nhân vật đã đến vị trí Generator an toàn!")
+            task.wait(0.5)
             
             _G.CurrentStage = 3
             return true
