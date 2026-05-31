@@ -1,128 +1,156 @@
 -- =========================================================================
--- [CƠ CHẾ MỚI] STAGE 1: BÒ XUYÊN TƯỜNG (CAO 3.5M) & TỰ ĐỘNG NHẶT FUEL
+-- ĐOẠN CODE DI CHUYỂN QUA MÁY PHÁT ĐIỆN (GENERATOR) THEO CƠ CHẾ MỚI
 -- =========================================================================
 
 local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
-local localPlayer = Players.LocalPlayer
-local DroppedItemsFolder = Workspace:WaitForChild("DroppedItems")
-local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local LocalPlayer = Players.LocalPlayer
+local MapFolder = Workspace:FindFirstChild("Map")
 
+local cachedGeneratorLocation = nil
 local PermanentNoclipEnabled = true
-local ignoredFuels = {}
 
--- --- HỆ THỐNG NOCLIP ĐI XUYÊN VẬT CẢN ---
+-- --- BACKGROUND SERVICE: PERMANENT NOCLIP ENGINE (Theo cơ chế script gốc) ---
 local function StartPermanentNoclip()
     local noclipConnection = nil
+
     local function ConnectNoclip()
         if noclipConnection then noclipConnection:Disconnect() end
+
         noclipConnection = RunService.Stepped:Connect(function()
-            if not PermanentNoclipEnabled then return end
-            local char = localPlayer.Character
-            if char then
-                for _, child in ipairs(char:GetDescendants()) do
-                    if child:IsA("BasePart") and child.CanCollide then child.CanCollide = false end
+            if not PermanentNoclipEnabled then
+                if noclipConnection then noclipConnection:Disconnect() end
+                return
+            end
+
+            local character = LocalPlayer.Character
+            if character then
+                -- Loại bỏ va chạm vật lý
+                for _, child in ipairs(character:GetDescendants()) do
+                    if child:IsA("BasePart") and child.CanCollide then
+                        child.CanCollide = false
+                    end
                 end
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+
+                -- Triệt tiêu gia tốc để tránh bị giật ngược (Anti-cheat rubberbanding)
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
             end
         end)
     end
+
     ConnectNoclip()
-    localPlayer.CharacterAdded:Connect(function() task.wait(0.1) ConnectNoclip() end)
+
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.1)
+        ConnectNoclip()
+    end)
 end
+
 StartPermanentNoclip()
 
--- --- THUẬT TOÁN BÒ XUYÊN TƯỜNG KHÓA CAO 3.5M ---
-local function adaptiveCrawlTo(targetPos, hrp, char)
-    -- [NÂNG CAO] Khóa độ cao đích đến cao hơn gốc 3.5m tránh lọt sàn
-    local finalTarget = targetPos + Vector3.new(0, 3.5, 0) 
-    local FAST_SPEED, SLOW_SPEED, STEP_DISTANCE = 35, 10, 0.25
-    local CLEARANCE_COOLDOWN, lastWallDetectedTime = 0.5, 0
-    local lockedYHeight = hrp.Position.Y
+-- --- HÀM QUÉT ĐỊNH VỊ MÁY PHÁT ĐIỆN (Theo cơ chế script gốc) ---
+local function getGeneratorPosition()
+    if cachedGeneratorLocation then return cachedGeneratorLocation end
+    if MapFolder then
+        local tiles = MapFolder:FindFirstChild("Tiles")
+        if tiles then
+            for _, child in ipairs(tiles:GetChildren()) do
+                if child.Name == "Generator" or child:FindFirstChild("Generator") then
+                    cachedGeneratorLocation = child:GetPivot().Position
+                    return cachedGeneratorLocation
+                end
+            end
+        end
+    end
+    local fallbackGen = Workspace:FindFirstChild("Generator", true)
+    if fallbackGen then
+        cachedGeneratorLocation = fallbackGen:GetPivot().Position
+        return cachedGeneratorLocation
+    end
+    return nil
+end
+
+-- --- THUẬT TOÁN DI CHUYỂN ADAPTIVE CRAWL (Giữ nguyên cấu trúc mượt mà chống lag) ---
+local function adaptiveCrawlTo(targetPos, humanoidRootPart, character)
+    -- Giữ nguyên cấu trúc cộng cao độ (Trong code gốc của bạn là +3)
+    local finalTarget = targetPos + Vector3.new(0, 3, 0)
+ 
+    local FAST_SPEED = 35     
+    local SLOW_SPEED = 10     
+    local STEP_DISTANCE = 0.25 
+ 
+    local CLEARANCE_COOLDOWN = 0.5 
+    local lastWallDetectedTime = 0
+ 
+    local lockedYHeight = humanoidRootPart.Position.Y
  
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = {char} 
+    raycastParams.FilterDescendantsInstances = {character} 
  
     while true do
-        if not hrp or not hrp.Parent then break end
-        local currentPos = hrp.Position
+        if not humanoidRootPart or not humanoidRootPart.Parent then break end
+        local currentPos = humanoidRootPart.Position
         local flatTarget = Vector3.new(finalTarget.X, lockedYHeight, finalTarget.Z)
         local remainingVector = flatTarget - currentPos
         local totalDistance = remainingVector.Magnitude
  
         if totalDistance <= 2 or totalDistance <= STEP_DISTANCE then
-            hrp.CFrame = CFrame.new(finalTarget)
-            hrp.AssemblyLinearVelocity = Vector3.new(0, -5, 0) 
-            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            hrp.Anchored = true; task.wait(0.05); hrp.Anchored = false 
+            humanoidRootPart.CFrame = CFrame.new(finalTarget)
+            humanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, -5, 0) 
+            humanoidRootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+ 
+            humanoidRootPart.Anchored = true
+            task.wait(0.05)
+            humanoidRootPart.Anchored = false 
             break
         end
  
         local direction = remainingVector.Unit
-        local rayResult = Workspace:Raycast(currentPos, direction * 5, raycastParams)
+        local lookAheadDistance = 5
+        local rayResult = Workspace:Raycast(currentPos, direction * lookAheadDistance, raycastParams)
+ 
         if rayResult and rayResult.Instance and rayResult.Instance.CanCollide then
             lastWallDetectedTime = os.clock()
         end
  
-        local activeStepDistance = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and 1.4 or 0.25
-        local currentAllowedSpeed = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and FAST_SPEED or SLOW_SPEED
-        local delayInterval = activeStepDistance / currentAllowedSpeed
-        local flattenedPosition = Vector3.new((currentPos + (direction * activeStepDistance)).X, lockedYHeight, (currentPos + (direction * activeStepDistance)).Z)
+        local activeStepDistance = 0.25 
+        local currentAllowedSpeed = SLOW_SPEED
+        if os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN then
+            activeStepDistance = 1.4  
+            currentAllowedSpeed = FAST_SPEED
+        end
  
-        hrp.CFrame = CFrame.new(flattenedPosition)
+        local delayInterval = activeStepDistance / currentAllowedSpeed
+        local nextPosition = currentPos + (direction * activeStepDistance)
+        local flattenedPosition = Vector3.new(nextPosition.X, lockedYHeight, nextPosition.Z)
+ 
+        humanoidRootPart.CFrame = CFrame.new(flattenedPosition)
         task.wait(delayInterval)
     end
 end
 
--- --- HÀM QUÉT FUEL CHUẨN ---
-local function getNearestFuel(rootPosition)
-    local nearestFuel, minDistance = nil, math.huge
-    if DroppedItemsFolder then
-        for _, obj in pairs(DroppedItemsFolder:GetChildren()) do
-            if obj.Name == "Fuel" and not ignoredFuels[obj] then
-                local part = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                if part and (part.Position - rootPosition).Magnitude < minDistance then
-                    minDistance = (part.Position - rootPosition).Magnitude
-                    nearestFuel = part
-                end
-            end
-        end
-    end
-    return nearestFuel
-end
+-- --- THỰC THI CHẠY ĐẾN MÁY ĐIỆN ---
+local function movePlayerToGenerator()
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- --- MAIN CHẠY STAGE 1 ---
-print("[STAGE 1] Đang thực hiện chu trình lấy Fuel...");
-local cycle = 1
+    print("[HỆ THỐNG] Đang tìm kiếm Máy phát điện...")
+    local generatorLocation = getGeneratorPosition()
 
-while cycle <= 2 do
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root then task.wait(0.5) continue end
-    
-    local targetFuel = getNearestFuel(root.Position)
-    if targetFuel then
-        local fuelModel = targetFuel.Parent
-        adaptiveCrawlTo(targetFuel.Position, root, character)
-        
-        -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY (NHẶT)
-        local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or fuelModel:FindFirstChildOfClass("ProximityPrompt")
-        if prompt then 
-            fireproximityprompt(prompt)
-            print(string.format("[🎉] Đã nhặt Fuel %d/2!", cycle))
-        end
-        
-        ignoredFuels[fuelModel] = true
-        cycle = cycle + 1
-        task.wait(0.5)
+    if generatorLocation then
+        print("[HỆ THỐNG] Đã tìm thấy vị trí. Bắt đầu di chuyển xuyên tường...")
+        adaptiveCrawlTo(generatorLocation, humanoidRootPart, character)
+        print("[🎯 THÀNH CÔNG] Nhân vật đã đến Generator an toàn bằng cơ chế mới!")
     else
-        task.wait(0.5)
+        warn("[⚠️ LỖI] Không tìm thấy Máy phát điện (Generator) nào trên bản đồ!")
     end
 end
 
-_G.CurrentStage = 2
-return true
+-- Kích hoạt lệnh di chuyển
+movePlayerToGenerator()
