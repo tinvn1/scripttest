@@ -1,5 +1,5 @@
 -- =========================================================================
--- [NEW MECHANICAL] STAGE 3: BÒ XUYÊN TƯỜNG ĐẾN TRẠM ĐIỆN (POWER BOX)
+-- [CƠ CHẾ MỚI] STAGE 3: BÒ XUYÊN TƯỜNG (CAO 3.5M) & TỰ ĐỘNG SỬA POWER BOX
 -- =========================================================================
 
 local Workspace = game:GetService("Workspace")
@@ -8,24 +8,22 @@ local RunService = game:GetService("RunService")
 
 local localPlayer = Players.LocalPlayer
 local MapFolder = Workspace:FindFirstChild("Map")
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
 local PermanentNoclipEnabled = true
 
--- --- BACKGROUND SERVICE: PERMANENT NOCLIP ENGINE (MỚI) ---
+-- --- HỆ THỐNG NOCLIP ĐI XUYÊN VẬT CẢN ---
 local function StartPermanentNoclip()
     local noclipConnection = nil
     local function ConnectNoclip()
         if noclipConnection then noclipConnection:Disconnect() end
         noclipConnection = RunService.Stepped:Connect(function()
-            if not PermanentNoclipEnabled then
-                if noclipConnection then noclipConnection:Disconnect() end
-                return
-            end
+            if not PermanentNoclipEnabled then return end
             local char = localPlayer.Character
             if char then
                 for _, child in ipairs(char:GetDescendants()) do
-                    if child:IsA("BasePart") and child.CanCollide then
-                        child.CanCollide = false
-                    end
+                    if child:IsA("BasePart") and child.CanCollide then child.CanCollide = false end
                 end
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
@@ -37,9 +35,10 @@ local function StartPermanentNoclip()
 end
 StartPermanentNoclip()
 
--- --- THUẬT TOÁN DI CHUYỂN XUYÊN TƯỜNG (ADAPTIVE CRAWL) ---
+-- --- THUẬT TOÁN BÒ XUYÊN TƯỜNG KHÓA CAO 3.5M ---
 local function adaptiveCrawlTo(targetPos, hrp, char)
-    local finalTarget = targetPos + Vector3.new(0, 3, 0)
+    -- [NÂNG CAO] Khóa độ cao đích đến cao hơn gốc 3.5m tránh lọt sàn
+    local finalTarget = targetPos + Vector3.new(0, 3.5, 0) 
     local FAST_SPEED, SLOW_SPEED, STEP_DISTANCE = 35, 10, 0.25
     local CLEARANCE_COOLDOWN, lastWallDetectedTime = 0.5, 0
     local lockedYHeight = hrp.Position.Y
@@ -72,79 +71,55 @@ local function adaptiveCrawlTo(targetPos, hrp, char)
         local activeStepDistance = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and 1.4 or 0.25
         local currentAllowedSpeed = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and FAST_SPEED or SLOW_SPEED
         local delayInterval = activeStepDistance / currentAllowedSpeed
-        local nextPosition = currentPos + (direction * activeStepDistance)
-        local flattenedPosition = Vector3.new(nextPosition.X, lockedYHeight, nextPosition.Z)
+        local flattenedPosition = Vector3.new((currentPos + (direction * activeStepDistance)).X, lockedYHeight, (currentPos + (direction * activeStepDistance)).Z)
  
         hrp.CFrame = CFrame.new(flattenedPosition)
         task.wait(delayInterval)
     end
 end
 
--- --- HÀM ĐỊNH VỊ TRẠM ĐIỆN (POWER BOX) GẦN NHẤT ---
+-- --- HÀM QUÉT TRẠM ĐIỆN (POWER BOX) ---
 local function getNearestPowerBox(rootPosition)
-    local nearestBoxPart = nil
-    local minDistance = math.huge
-    
-    -- Ưu tiên quét theo cấu hình Folder Map trước để tối ưu hiệu năng
     if MapFolder and MapFolder:FindFirstChild("Tiles") then
         for _, child in ipairs(MapFolder.Tiles:GetChildren()) do
             if child.Name == "Power Plant" then
                 local powerBox = child:FindFirstChild("Power Box")
                 if powerBox then
-                    local part = powerBox:IsA("BasePart") and powerBox or powerBox.PrimaryPart or powerBox:FindFirstChildWhichIsA("BasePart")
-                    if part then
-                        local dist = (rootPosition - part.Position).Magnitude
-                        if dist < minDistance then
-                            minDistance = dist; nearestBoxPart = part
-                        end
-                    end
+                    return powerBox:IsA("BasePart") and powerBox or powerBox.PrimaryPart or powerBox:FindFirstChildWhichIsA("BasePart")
                 end
             end
         end
     end
-    
-    -- Quét diện rộng dự phòng nếu map không nằm trong thư mục Tiles
-    if not nearestBoxPart then
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj.Name == "Power Box" then
-                local part = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                if part then
-                    local dist = (rootPosition - part.Position).Magnitude
-                    if dist < minDistance then 
-                        minDistance = dist; nearestBoxPart = part 
-                    end
-                end
-            end
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj.Name == "Power Box" then 
+            return obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
         end
     end
-    return nearestBoxPart
+    return nil
 end
 
--- =========================================================================
--- VÒNG LẶP ĐIỀU KHIỂN CHÍNH STAGE 3
--- =========================================================================
-print("[STAGE 3] Khởi động hệ thống di chuyển xuyên tường tiến thẳng đến Trạm điện...");
+-- --- MAIN CHẠY STAGE 3 ---
+print("[STAGE 3] Đang tiến tới Trạm điện (Power Box)...");
 local reached = false
 
 while not reached do
-    local char = localPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    
+    local root = character:FindFirstChild("HumanoidRootPart")
     if root then
         local targetBox = getNearestPowerBox(root.Position)
-        
         if targetBox then
-            local distance = (root.Position - targetBox.Position).Magnitude
+            local powerBoxModel = targetBox.Parent
+            adaptiveCrawlTo(targetBox.Position, root, character)
             
-            if distance > 4.5 then
-                print("[STAGE 3] Tiến hành bò xuyên qua mọi rào chắn đến Power Box...")
-                adaptiveCrawlTo(targetBox.Position, root, char)
-            else
-                print("[🎯 STAGE 3 SUCCESS] Nhân vật đã vượt qua mọi vật cản và chạm đích Power Box thành công!");
-                reached = true
+            -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY (SỬA CHỮA)
+            local prompt = targetBox:FindFirstChildOfClass("ProximityPrompt") or powerBoxModel:FindFirstChildOfClass("ProximityPrompt")
+            if prompt then 
+                fireproximityprompt(prompt)
+                print("[🎯 STAGE 3 SUCCESS] Đã sửa chữa điện thành công!")
+                task.wait(2)
             end
+            reached = true
         else
-            task.wait(0.2)
+            task.wait(0.5)
         end
     else
         task.wait(0.3)
