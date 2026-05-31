@@ -109,12 +109,6 @@ while cycle <= 2 do
         local fuelModel = targetFuel.Parent
         adaptiveCrawlTo(targetFuel.Position, root, character)
         
-        -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY (NHẶT)
-        local prompt = targetFuel:FindFirstChildOfClass("ProximityPrompt") or fuelModel:FindFirstChildOfClass("ProximityPrompt")
-        if prompt then 
-            fireproximityprompt(prompt)
-            print(string.format("[🎉] Đã nhặt Fuel %d/2!", cycle))
-        end
         
         ignoredFuels[fuelModel] = true
         cycle = cycle + 1
