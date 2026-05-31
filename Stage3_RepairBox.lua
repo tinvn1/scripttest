@@ -1,144 +1,259 @@
--- =========================================================================
--- [ANTI-LAG FIXED] STAGE 3: BÒ XUYÊN TƯỜNG ĐẾN TRẠM ĐIỆN (POWER BOX)
--- (SỬA LỖI TRÀN CPU - ĐỒNG BỘ CAO ĐỘ TRÁNH KẸT VÒNG LẶP - MƯỢT MÀ KHÔNG LAG)
--- =========================================================================
-
+print("[HỆ THỐNG] Đang kích hoạt cấu hình Thoát Góc Kẹt Nâng Cao... Vui lòng đợi 3 giây.")
+task.wait(3)
 local Workspace = game:GetService("Workspace")
+local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
+local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
-local MapFolder = Workspace:FindFirstChild("Map")
-local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local RUN_SPEED = 30
 
-local PermanentNoclipEnabled = true
+-- Thu nhỏ AgentRadius để AI chịu lách vào hốc hẹp, khe tường
+local path = PathfindingService:CreatePath({
+    AgentRadius = 1.6, 
+    AgentHeight = 5.0,
+    AgentCanJump = true,
+    Costs = { Water = math.huge }
+})
 
--- --- HỆ THỐNG NOCLIP AN TOÀN CHỐNG NGHẼN MẠNG ---
-local function StartPermanentNoclip()
-    local noclipConnection = nil
-    local function ConnectNoclip()
-        if noclipConnection then noclipConnection:Disconnect() end
-        noclipConnection = RunService.Stepped:Connect(function()
-            if not PermanentNoclipEnabled then return end
-            local char = localPlayer.Character
-            if char then
-                for _, child in ipairs(char:GetDescendants()) do
-                    if child:IsA("BasePart") and child.CanCollide then child.CanCollide = false end
-                end
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                -- Chỉ khóa vận tốc khi di chuyển quá nhanh tránh anti-cheat hoặc lag băng thông
-                if hrp and hrp.Anchored == false and hrp.AssemblyLinearVelocity.Magnitude > 50 then 
-                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
-                end
+local lastJumpTime = 0
+local JUMP_COOLDOWN = 0.25 
+
+-- =========================================================================
+-- 🔥 1. LOOP GIỮ CỐ ĐỊNH TỐC ĐỘ 30 
+-- =========================================================================
+local speedLoop = task.spawn(function()
+    while true do
+        pcall(function()
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
+                localPlayer.Character.Humanoid.WalkSpeed = RUN_SPEED
+            end
+        end)
+        task.wait(0.1)
+    end
+end)
+
+-- =========================================================================
+-- 🔥 2. NHẢY VÔ HẠN AN TOÀN CHỐNG SPAM (DÀNH CHO DI CHUYỂN THƯỜNG)
+-- =========================================================================
+local function triggerSafeInfJump(humanoid)
+    local now = os.clock()
+    if now - lastJumpTime >= JUMP_COOLDOWN then
+        lastJumpTime = now
+        pcall(function()
+            if humanoid and humanoid.Health > 0 then
+                humanoid:ChangeState("Jumping")
             end
         end)
     end
-    ConnectNoclip()
-    localPlayer.CharacterAdded:Connect(function() task.wait(0.2) ConnectNoclip() end)
 end
-StartPermanentNoclip()
 
--- --- THUẬT TOÁN DI CHUYỂN MƯỢT MÀ CHỐNG OVERLOAD ---
-local function adaptiveCrawlTo(targetPos, hrp, char)
-    -- Khóa độ cao đích đến cao hơn gốc 3.5 block theo yêu cầu
-    local finalTarget = targetPos + Vector3.new(0, 3.5, 0) 
-    local FAST_SPEED, SLOW_SPEED, STEP_DISTANCE = 35, 10, 0.25
-    local CLEARANCE_COOLDOWN, lastWallDetectedTime = 0.5, 0
-    
-    -- [FIX LOGIC] Đồng bộ chiều cao người với chiều cao đích ngay từ đầu để vòng lặp kết thúc chính xác
-    local lockedYHeight = finalTarget.Y 
- 
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = {char} 
- 
-    while true do
-        if not hrp or not hrp.Parent then break end
-        local currentPos = hrp.Position
-        local flatTarget = Vector3.new(finalTarget.X, lockedYHeight, finalTarget.Z)
-        local remainingVector = flatTarget - currentPos
-        local totalDistance = remainingVector.Magnitude
- 
-        -- Kiểm tra chạm đích để giải phóng vòng lặp chính xác
-        if totalDistance <= 2 or totalDistance <= STEP_DISTANCE then
-            hrp.CFrame = CFrame.new(finalTarget)
-            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
-            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            hrp.Anchored = true; task.wait(0.05); hrp.Anchored = false 
-            break -- Thoát vòng lặp thành công
-        end
- 
-        local direction = remainingVector.Unit
-        local rayResult = Workspace:Raycast(currentPos, direction * 5, raycastParams)
-        if rayResult and rayResult.Instance and rayResult.Instance.CanCollide then
-            lastWallDetectedTime = os.clock()
-        end
- 
-        local activeStepDistance = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and 1.4 or 0.25
-        local currentAllowedSpeed = (os.clock() - lastWallDetectedTime >= CLEARANCE_COOLDOWN) and FAST_SPEED or SLOW_SPEED
-        local delayInterval = activeStepDistance / currentAllowedSpeed
-        local nextPosition = currentPos + (direction * activeStepDistance)
-        local flattenedPosition = Vector3.new(nextPosition.X, lockedYHeight, nextPosition.Z)
- 
-        hrp.CFrame = CFrame.new(flattenedPosition)
-        
-        -- 🔥 CHỐNG LAG: Ép luồng CPU nghỉ tối thiểu 0.01s để game chạy mượt, không đơ màn hình
-        task.wait(math.max(delayInterval, 0.01))
+if _G.InfJumpHooked then _G.InfJumpHooked:Disconnect() end
+_G.InfJumpHooked = UserInputService.JumpRequest:Connect(function()
+    if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        triggerSafeInfJump(localPlayer.Character:FindFirstChildOfClass("Humanoid"))
     end
+end)
+
+-- =========================================================================
+-- 🔥 3. THUẬT TOÁN SIÊU GỠ KẸT: LÙI XA + BẺ GÓC CHÉO + INFJUMP 1 MẠCH
+-- =========================================================================
+local function executeSmartEscape(rootPart, humanoid, targetPosition)
+    pcall(function()
+        -- Hủy lệnh di chuyển hiện tại để tránh bị hút ngược vào tường
+        humanoid:MoveTo(rootPart.Position)
+        
+        -- 1. Tính hướng giật lùi hẳn ra xa mục tiêu để lấy khoảng trống
+        local backwardDirection = (rootPart.Position - targetPosition).Unit
+        if backwardDirection.Magnitude == 0 or backwardDirection ~= backwardDirection then
+            backwardDirection = -rootPart.CFrame.LookVector
+        end
+        
+        -- Ép nhân vật chạy lùi ra xa
+        humanoid:MoveTo(rootPart.Position + (backwardDirection * 10))
+        task.wait(0.25) -- Lùi xa hơn một chút để thoát hoàn toàn tầm cấn của lưới/mái nhà
+
+        -- 2. Bẻ góc di chuyển (Tạo một hướng chéo ngẫu nhiên 45-90 độ để lách qua rào chắn)
+        local randomAngle = math.rad(math.random(45, 90) * (math.random(1, 2) == 1 and 1 or -1))
+        local escapeDirection = Vector3.new(
+            backwardDirection.X * math.cos(randomAngle) - backwardDirection.Z * math.sin(randomAngle),
+            0,
+            backwardDirection.X * math.sin(randomAngle) + backwardDirection.Z * math.cos(randomAngle)
+        ).Unit
+
+        -- 3. Kích hoạt chuỗi InfJump gối đầu liên tiếp 5 phát một mạch không delay
+        task.spawn(function()
+            for _ = 1, 5 do
+                if humanoid and humanoid.Health > 0 then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+                task.wait(0.05) -- Tốc độ dậm nhảy siêu tốc để ép nhân vật bay lên
+            end
+        end)
+
+        -- 4. Bơm lực đẩy xiên theo hướng chéo đã tính để quăng nhân vật ra khỏi góc rào
+        rootPart.AssemblyLinearVelocity = (escapeDirection * (RUN_SPEED * 1.5)) + Vector3.new(0, 38, 0)
+        task.wait(0.2)
+    end)
 end
 
--- --- HÀM QUÉT TRẠM ĐIỆN (POWER BOX) ---
+-- =========================================================================
+-- HÀM ĐỊNH VỊ TRẠM ĐIỆN TỐI ƯU
+-- =========================================================================
 local function getNearestPowerBox(rootPosition)
-    if MapFolder and MapFolder:FindFirstChild("Tiles") then
-        for _, child in ipairs(MapFolder.Tiles:GetChildren()) do
-            if child.Name == "Power Plant" then
-                local powerBox = child:FindFirstChild("Power Box")
-                if powerBox then
-                    return powerBox:IsA("BasePart") and powerBox or powerBox.PrimaryPart or powerBox:FindFirstChildWhichIsA("BasePart")
+    local nearestBoxPart = nil
+    local minDistance = math.huge
+    local descendants = Workspace:GetDescendants()
+    
+    for i = 1, #descendants do
+        local obj = descendants[i]
+        if obj.Name == "Power Box" then
+            local targetPart = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            if not targetPart and obj:FindFirstChild("Prompt") then
+                targetPart = obj:FindFirstChild("Prompt").Parent
+            end
+            
+            if targetPart and targetPart:IsA("BasePart") then
+                local dist = (rootPosition - targetPart.Position).Magnitude
+                if dist < minDistance then 
+                    minDistance = dist
+                    nearestBoxPart = targetPart 
                 end
             end
         end
     end
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj.Name == "Power Box" then 
-            return obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-        end
-    end
-    return nil
+    return nearestBoxPart
 end
 
--- --- MAIN CHẠY STAGE 3 ---
-print("[STAGE 3] Khởi chạy tiến trình sửa điện chống Lag...");
+-- =========================================================================
+-- 🔥 HÀM DI CHUYỂN CHUYÊN DỤNG CHO MOBILE CHỐNG CẤN HÀNG RÀO
+-- =========================================================================
+local function walkPathToTarget(rootPart, humanoid, targetPart)
+    if not rootPart or not targetPart or not targetPart.Parent then return false end
+    
+    local distanceToTarget = (rootPart.Position - targetPart.Position).Magnitude
+    
+    -- CHIẾN THUẬT VÀO HỐC: Nếu đã ở gần (< 25 studs), ép đi thẳng trực tiếp vào mục tiêu
+    if distanceToTarget < 25 then
+        humanoid:MoveTo(targetPart.Position)
+        
+        local startPos = rootPart.Position
+        local startTime = os.clock()
+        
+        while (rootPart.Position - targetPart.Position).Magnitude > 4.5 do
+            if (os.clock() - startTime) > 0.15 then
+                local moved = (rootPart.Position - startPos).Magnitude
+                if moved < 1.4 then
+                    -- Phát hiện kẹt góc rào: Thực hiện combo Giật lùi + Bẻ lái chéo + Nhảy một mạch
+                    executeSmartEscape(rootPart, humanoid, targetPart.Position)
+                end
+                startTime = os.clock()
+                startPos = rootPart.Position
+            end
+            task.wait()
+            humanoid:MoveTo(targetPart.Position)
+        end
+        return true
+    end
+
+    -- ĐƯỜNG DÀI: Chạy bằng Pathfinding bình thường
+    local success, err = pcall(function()
+        path:ComputeAsync(rootPart.Position, targetPart.Position)
+    end)
+    
+    if success and path.Status == Enum.PathStatus.Success then
+        local waypoints = path:GetWaypoints()
+        local totalWaypoints = #waypoints
+        
+        local startIndex = 1
+        if totalWaypoints > 2 and (rootPart.Position - waypoints[2].Position).Magnitude < 4 then
+            startIndex = 2
+        end
+        
+        for i = startIndex, totalWaypoints do
+            local waypoint = waypoints[i]
+            if not rootPart.Parent or not targetPart.Parent then return false end
+            
+            if (rootPart.Position - targetPart.Position).Magnitude < 25 then
+                return false 
+            end
+            
+            if waypoint.Action == Enum.PathWaypointAction.Jump then 
+                triggerSafeInfJump(humanoid)
+            end
+            
+            humanoid:MoveTo(waypoint.Position)
+            
+            local startPos = rootPart.Position
+            local startTime = os.clock()
+            local isStuck = false
+            
+            while true do
+                local currentDist = (rootPart.Position - waypoint.Position).Magnitude
+                
+                if i == totalWaypoints then
+                    if currentDist < 3.5 then break end
+                else
+                    if currentDist < 5.0 then break end 
+                end
+                
+                if (os.clock() - startTime) > 0.15 then
+                    local movedDistance = (rootPart.Position - startPos).Magnitude
+                    
+                    if movedDistance < 1.4 then
+                        -- Gỡ kẹt đường dài thông minh
+                        executeSmartEscape(rootPart, humanoid, waypoint.Position)
+                        isStuck = true
+                        break 
+                    end
+                    startTime = os.clock()
+                    startPos = rootPart.Position
+                end
+                task.wait()
+            end
+            
+            if isStuck then return false end
+        end
+        return true
+    else
+        -- Phục hồi khẩn cấp khi lỗi lộ trình đường dài
+        executeSmartEscape(rootPart, humanoid, targetPart.Position)
+        return false
+    end
+end
+
+-- =========================================================================
+-- VÒNG LẶP ĐIỀU KHIỂN CHÍNH CỦA STAGE 3
+-- =========================================================================
+print("[STAGE 3] Hệ thống di chuyển tránh rào chắn thông minh đang hoạt động...");
 local reached = false
 
 while not reached do
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if root then
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if root and humanoid and humanoid.Health > 0 then
         local targetBox = getNearestPowerBox(root.Position)
+        
         if targetBox then
-            local powerBoxModel = targetBox.Parent
-            adaptiveCrawlTo(targetBox.Position, root, character)
+            local distance = (root.Position - targetBox.Position).Magnitude
             
-            -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY (SỬA CHỮA) - Đã đến nơi mượt mà
-            print("[🎯] Đã chạm đích Power Box. Tiến hành kích hoạt sửa máy...")
-            local prompt = targetBox:FindFirstChildOfClass("ProximityPrompt") or powerBoxModel:FindFirstChildOfClass("ProximityPrompt")
-            if prompt then 
-                fireproximityprompt(prompt)
-                print("[🎯 STAGE 3 SUCCESS] Tác động sửa điện thành công!")
-                task.wait(1.5) -- Quãng nghỉ ngắn đồng bộ dữ liệu server
+            if distance > 4.5 then
+                walkPathToTarget(root, humanoid, targetBox)
+            else
+                print("[🎯 STAGE 3 SUCCESS] Nhân vật đã vượt qua góc kẹt lưới sắt và chạm đích!");
+                task.cancel(speedLoop) 
+                reached = true
             end
-            reached = true
         else
-            task.wait(0.5)
+            task.wait(0.1)
         end
     else
         task.wait(0.3)
     end
-    -- Giảm tần suất vòng lặp ngoài xuống 0.05s để tránh lag rác luồng
-    task.wait(0.05)
+    task.wait(0.01)
 end
 
-task.wait(0.1)
+task.wait(0.05)
 _G.CurrentStage = 4
 return true
