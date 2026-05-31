@@ -1,5 +1,6 @@
 -- =========================================================================
 -- [CƠ CHẾ MỚI] STAGE 2: BÒ XUYÊN TƯỜNG (CAO 3.5M) & TỰ ĐỘNG NẠP FUEL VÀO GEN
+-- (ĐÃ LOẠI BỎ HOÀN TOÀN BƯỚC CHECK KHOẢNG CÁCH MÁY)
 -- =========================================================================
 
 local Workspace = game:GetService("Workspace")
@@ -37,7 +38,7 @@ StartPermanentNoclip()
 
 -- --- THUẬT TOÁN BÒ XUYÊN TƯỜNG KHÓA CAO 3.5M ---
 local function adaptiveCrawlTo(targetPos, hrp, char)
-    -- [NÂNG CAO] Khóa độ cao đích đến cao hơn gốc 3.5m tránh lọt sàn
+    -- [NÂNG CAO] Khóa độ cao đích đến cao hơn gốc 3.5m tránh lọt sàn/kẹt rào
     local finalTarget = targetPos + Vector3.new(0, 3.5, 0) 
     local FAST_SPEED, SLOW_SPEED, STEP_DISTANCE = 35, 10, 0.25
     local CLEARANCE_COOLDOWN, lastWallDetectedTime = 0.5, 0
@@ -93,8 +94,10 @@ local function getGeneratorInstance()
     return nil
 end
 
--- --- MAIN CHẠY STAGE 2 ---
-print("[STAGE 2] Đang di chuyển về Máy phát điện...");
+-- =========================================================================
+-- LUỒNG THỰC THI CHÍNH CỦA STAGE 2 (ĐÃ BỎ PHẦN CHECK MÁY)
+-- =========================================================================
+print("[STAGE 2] Thực thi di chuyển xuyên tường nâng cao về phía máy phát điện...");
 local root = character:FindFirstChild("HumanoidRootPart")
 
 if root then
@@ -102,13 +105,16 @@ if root then
     if generatorObj then
         local genPart = generatorObj:IsA("BasePart") and generatorObj or generatorObj.PrimaryPart or generatorObj:FindFirstChildWhichIsA("BasePart")
         if genPart then
+            -- Bỏ qua bước so sánh khoảng cách cũ, lao thẳng trực tiếp đến đích
+            print("[STAGE 2] Tiến thẳng xuyên vật cản đến tâm Generator...")
             adaptiveCrawlTo(genPart.Position, root, character)
             
-            -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY (NẠP NHIÊN LIỆU)
+            -- 🔥 TỰ ĐỘNG TÁC ĐỘNG MÁY KHÔNG CẦN CHỜ CHECK
+            print("[STAGE 2] Đã chạm vùng đích, kích hoạt nạp Fuel...")
             local prompt = generatorObj:FindFirstChildOfClass("ProximityPrompt") or genPart:FindFirstChildOfClass("ProximityPrompt")
             if prompt then 
                 fireproximityprompt(prompt)
-                print("[🎯 STAGE 2 SUCCESS] Đã tự nạp nhiên liệu máy!")
+                print("[🎯 STAGE 2 SUCCESS] Đã tự nạp nhiên liệu thành công!")
                 task.wait(1)
             end
             
@@ -117,5 +123,6 @@ if root then
         end
     end
 end
+
 _G.CurrentStage = 1
 return false
