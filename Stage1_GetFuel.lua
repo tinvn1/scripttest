@@ -1,14 +1,61 @@
 -- =========================================================================
--- CHỈ DI CHUYỂN ĐẾN CỤC NHIÊN LIỆU (FUEL) GẦN NHẤT
+-- ĐÃ TÍCH HỢP NOCLIP CHUẨN GỐC + DI CHUYỂN ĐẾN FUEL GẦN NHẤT
 -- =========================================================================
 
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService") -- Thêm service này cho Noclip gốc
 
 local LocalPlayer = Players.LocalPlayer
 local DroppedItemsFolder = Workspace:WaitForChild("DroppedItems")
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local PermanentNoclipEnabled = true
+
+-- --- BACKGROUND SERVICE: PERMANENT NOCLIP ENGINE (HÀM GỐC CHUẨN 100%) ---
+local function StartPermanentNoclip()
+    local noclipConnection = nil
+ 
+    local function ConnectNoclip()
+        if noclipConnection then noclipConnection:Disconnect() end
+ 
+        noclipConnection = RunService.Stepped:Connect(function()
+            if not PermanentNoclipEnabled then
+                if noclipConnection then noclipConnection:Disconnect() end
+                return
+            end
+ 
+            local character = LocalPlayer.Character
+            if character then
+                -- Instantly strips all collisions before physics steps process
+                for _, child in ipairs(character:GetDescendants()) do
+                    if child:IsA("BasePart") and child.CanCollide then
+                        child.CanCollide = false
+                    end
+                end
+ 
+                -- Zeroes velocity to stop anti-cheat rubberbanding
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+            end
+        end)
+    end
+ 
+    ConnectNoclip()
+ 
+    -- Re-applies the permanent noclip loop whenever you respawn
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.1)
+        ConnectNoclip()
+    end)
+end
+
+-- Kích hoạt Noclip hệ thống
+StartPermanentNoclip()
+
 
 -- 1. HÀM DI CHUYỂN XUYÊN TƯỜNG (ADAPTIVE CRAWL)
 local function adaptiveCrawlTo(targetPos, humanoidRootPart, character)
@@ -98,7 +145,6 @@ local function getClosestFuelPosition(currentPos)
             break
         end
         
-        -- Kiểm tra độ cao để tránh kẹt ở những cục Fuel nằm trên vật thể quá cao
         local targetPosition = bestTarget:GetPivot().Position
         local heightDifference = targetPosition.Y - currentPos.Y
         
@@ -119,7 +165,6 @@ local targetFuel = getClosestFuelPosition(humanoidRootPart.Position)
 
 if targetFuel then
     print("[Step 1] Đang di chuyển tới Fuel.")
-    -- Thực hiện bò/bay xuyên tường đến cục Fuel
     adaptiveCrawlTo(targetFuel:GetPivot().Position, humanoidRootPart, character)
     print("[Complete] Đã đến vị trí cục Fuel!")
 else
